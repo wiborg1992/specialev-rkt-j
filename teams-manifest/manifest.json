@@ -1,0 +1,50 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "REPLACE_WITH_GUID",
+  "packageName": "dk.grundfos.meeting-ai-visualizer",
+  "developer": {
+    "name": "Grundfos Prototype",
+    "websiteUrl": "REPLACE_WITH_BASE_URL",
+    "privacyUrl": "REPLACE_WITH_BASE_URL",
+    "termsOfUseUrl": "REPLACE_WITH_BASE_URL"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "Meeting AI",
+    "full": "Meeting AI Visualizer – Grundfos"
+  },
+  "description": {
+    "short": "Real-time AI visualisering af møder",
+    "full": "Transskriberer møder og genererer automatisk professionelle visualiseringer via Claude AI. Prototype til Grundfos kravspecifikationsmøder."
+  },
+  "accentColor": "#002A5C",
+  "configurableTabs": [
+    {
+      "configurationUrl": "REPLACE_WITH_BASE_URL/config.html",
+      "canUpdateConfiguration": true,
+      "scopes": ["team", "groupchat", "meetings"],
+      "meetingSurfaces": ["sidePanel", "stage"]
+    }
+  ],
+  "staticTabs": [
+    {
+      "entityId": "meeting-ai-index",
+      "name": "Meeting AI",
+      "contentUrl": "REPLACE_WITH_BASE_URL/index.html",
+      "websiteUrl": "REPLACE_WITH_BASE_URL/index.html",
+      "scopes": ["personal"]
+    }
+  ],
+  "permissions": ["identity"],
+  "validDomains": [
+    "REPLACE_WITH_DOMAIN"
+  ],
+  "webApplicationInfo": {
+    "id": "REPLACE_WITH_GUID"
+  }
+}

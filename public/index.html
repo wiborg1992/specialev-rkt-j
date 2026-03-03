@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meeting AI · Grundfos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://res.cdn.office.net/teams-js/2.22.0/js/MicrosoftTeams.min.js"></script>
+  <style>
+    /* ═══════════════════════════════════════════
+       TOKENS
+    ═══════════════════════════════════════════ */
+    :root {
+      --navy:       #002A5C;
+      --navy-2:     #001a3a;
+      --blue:       #0077C8;
+      --blue-mid:   #0090e8;
+      --blue-light: #dbeeff;
+      --blue-soft:  rgba(0,119,200,.09);
+      --blue-glow:  rgba(0,119,200,.14);
+
+      --ink:        #0f172a;
+      --slate:      #334155;
+      --muted:      #64748b;
+      --dim:        #94a3b8;
+      --border:     #dde4ee;
+      --border-2:   #e8edf5;
+      --surface:    #f3f7fb;
+      --surface-2:  #eaf0f8;
+      --white:      #ffffff;
+
+      --green:      #16a34a;
+      --green-soft: rgba(22,163,74,.1);
+      --red:        #dc2626;
+      --red-soft:   rgba(220,38,38,.1);
+      --amber:      #d97706;
+
+      --radius-xl: 14px;
+      --radius-lg: 11px;
+      --radius-md: 8px;
+      --radius-sm: 6px;
+
+      --shadow-sm:  0 1px 3px rgba(0,30,80,.07), 0 1px 2px rgba(0,30,80,.04);
+      --shadow-md:  0 4px 14px rgba(0,30,80,.09), 0 1px 4px rgba(0,30,80,.05);
+      --shadow-lg:  0 8px 28px rgba(0,30,80,.11), 0 2px 8px rgba(0,30,80,.06);
+
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --tr: 0.17s cubic-bezier(.4,0,.2,1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ═══════════════════════════════════════════
+       ENVIRONMENT — light with subtle dot grid
+    ═══════════════════════════════════════════ */
+    body {
+      font-family: var(--font);
+      height: 100vh;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      background-color: #f4f7fd;
+      background-image:
+        radial-gradient(ellipse 50% 40% at 90% 0%,   rgba(0,119,200,.045) 0%, transparent 55%),
+        radial-gradient(circle, rgba(0,50,120,.032) 1px, transparent 1px);
+      background-size: auto, 28px 28px;
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ═══════════════════════════════════════════
+       TOPBAR
+    ═══════════════════════════════════════════ */
+    .topbar {
+      height: 52px; padding: 0 22px;
+      display: flex; align-items: center; gap: 13px;
+      flex-shrink: 0;
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 1px 0 rgba(0,30,80,.04);
+    }
+
+    .brand-mark {
+      width: 30px; height: 30px;
+      background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.82rem; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0,42,92,.28);
+    }
+
+    .topbar-title { display: flex; flex-direction: column; }
+    .topbar-title h1 {
+      font-size: 0.84rem; font-weight: 700;
+      color: var(--ink); letter-spacing: -.01em; line-height: 1.2;
+    }
+    .topbar-title .sub {
+      font-size: 0.63rem; color: var(--dim);
+      font-weight: 500; letter-spacing: .05em; text-transform: uppercase;
+    }
+
+    .topbar-sep { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; }
+    .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 9px; }
+
+    /* Status chip */
+    .rec-chip {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 4px 11px 4px 8px;
+      font-size: 0.67rem; font-weight: 600; color: var(--muted);
+      letter-spacing: .05em; transition: var(--tr);
+    }
+    .rec-chip.active {
+      background: var(--red-soft); border-color: rgba(220,38,38,.25); color: #b91c1c;
+    }
+    .rec-chip .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--dim); transition: background var(--tr);
+    }
+    .rec-chip.active .dot {
+      background: var(--red); animation: chipPulse 1.2s ease-in-out infinite;
+    }
+    @keyframes chipPulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%      { opacity:.45; transform:scale(.75); }
+    }
+
+    .teams-badge {
+      display: none;
+      background: rgba(91,95,199,.12); border: 1px solid rgba(91,95,199,.28);
+      color: #4f52b2; font-size: .62rem; font-weight: 700;
+      padding: 3px 8px; border-radius: 4px; letter-spacing: .06em;
+    }
+    .btn-share-stage {
+      display: none; align-items: center; gap: 5px;
+      background: var(--blue-soft); border: 1px solid rgba(0,119,200,.22);
+      color: var(--blue); border-radius: var(--radius-sm);
+      padding: 5px 12px; font-size: .72rem; font-weight: 600;
+      cursor: pointer; font-family: var(--font); transition: var(--tr);
+    }
+    .btn-share-stage:hover { background: rgba(0,119,200,.15); }
+
+    /* ═══════════════════════════════════════════
+       MAIN
+    ═══════════════════════════════════════════ */
+    .main { display: flex; flex: 1; overflow: hidden; gap: 13px; padding: 13px; }
+
+    /* ═══════════════════════════════════════════
+       PANELS
+    ═══════════════════════════════════════════ */
+    .panel {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-md);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    .panel-left  { width: 358px; flex-shrink: 0; }
+    .panel-right { flex: 1; }
+
+    .panel-header {
+      padding: 12px 16px 10px;
+      border-bottom: 1px solid var(--border-2);
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+    }
+    .ph-icon {
+      width: 26px; height: 26px;
+      background: var(--blue-soft); border: 1px solid rgba(0,119,200,.15);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .76rem; flex-shrink: 0;
+    }
+    .ph-icon.purple { background: rgba(124,58,237,.07); border-color: rgba(124,58,237,.14); }
+    .ph-text { flex: 1; }
+    .ph-text h2 {
+      font-size: .8rem; font-weight: 700; color: var(--ink);
+      letter-spacing: -.01em; line-height: 1.2;
+    }
+    .ph-text .sub { font-size: .63rem; color: var(--dim); font-weight: 500; margin-top: 1px; }
+
+    .word-badge {
+      background: var(--blue-soft); border: 1px solid rgba(0,119,200,.18);
+      color: var(--blue); font-size: .64rem; font-weight: 700;
+      padding: 2px 8px; border-radius: 10px; letter-spacing: .02em;
+    }
+
+    /* ─── Segmented tabs ─── */
+    .tab-bar {
+      padding: 7px 11px;
+      border-bottom: 1px solid var(--border-2);
+      flex-shrink: 0; background: var(--white);
+    }
+    .tab-inner {
+      position: relative; display: flex;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 7px; padding: 3px;
+    }
+    .tab-indicator {
+      position: absolute; top: 3px; left: 3px; bottom: 3px;
+      width: calc(50% - 3px);
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 5px; box-shadow: var(--shadow-sm);
+      transition: transform var(--tr); pointer-events: none;
+    }
+    .tab-indicator.paste { transform: translateX(calc(100%)); }
+    .tab-btn {
+      flex: 1; padding: 5px 8px; border: none; background: transparent;
+      color: var(--muted); font-size: .72rem; font-weight: 600;
+      cursor: pointer; border-radius: 5px; transition: color var(--tr);
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      position: relative; z-index: 1; font-family: var(--font);
+    }
+    .tab-btn.active { color: var(--ink); }
+    .tab-btn:not(.active):hover { color: var(--slate); }
+
+    .tab-pane { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+    .tab-pane.active { display: flex; }
+
+    /* ─── Rec row ─── */
+    .rec-row {
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border-2);
+      display: flex; align-items: center; gap: 9px;
+      flex-shrink: 0; background: var(--white);
+    }
+
+    /* Waveform */
+    .waveform { display: flex; align-items: center; gap: 2.5px; height: 18px; flex-shrink: 0; }
+    .waveform .bar { width: 2.5px; border-radius: 2px; background: var(--dim); }
+    .waveform .bar:nth-child(1) { height: 5px; }
+    .waveform .bar:nth-child(2) { height: 11px; }
+    .waveform .bar:nth-child(3) { height: 16px; }
+    .waveform .bar:nth-child(4) { height: 9px; }
+    .waveform .bar:nth-child(5) { height: 13px; }
+    .waveform .bar:nth-child(6) { height: 6px; }
+
+    body.recording .waveform .bar { background: var(--red); }
+    body.recording .waveform .bar:nth-child(1) { animation: wave .9s ease-in-out infinite 0s; }
+    body.recording .waveform .bar:nth-child(2) { animation: wave .9s ease-in-out infinite .12s; }
+    body.recording .waveform .bar:nth-child(3) { animation: wave .9s ease-in-out infinite .24s; }
+    body.recording .waveform .bar:nth-child(4) { animation: wave .9s ease-in-out infinite .08s; }
+    body.recording .waveform .bar:nth-child(5) { animation: wave .9s ease-in-out infinite .18s; }
+    body.recording .waveform .bar:nth-child(6) { animation: wave .9s ease-in-out infinite .30s; }
+    @keyframes wave {
+      0%,100% { transform: scaleY(.45); opacity:.5; }
+      50%      { transform: scaleY(1.4); opacity:1; }
+    }
+
+    .rec-status-text { font-size: .73rem; font-weight: 600; color: var(--muted); flex: 1; }
+    body.recording .rec-status-text { color: #b91c1c; }
+
+    .quality-wrap { display: none; align-items: center; gap: 5px; font-size: .64rem; color: var(--muted); }
+    .quality-wrap.visible { display: flex; }
+    .quality-track { width: 42px; height: 3px; background: var(--border-2); border-radius: 2px; overflow: hidden; }
+    .quality-fill { height: 100%; width: 0%; border-radius: 2px; transition: width .4s, background .4s; background: var(--green); }
+    .quality-fill.medium { background: var(--amber); }
+    .quality-fill.low    { background: var(--red); }
+
+    .noise-warning {
+      display: none; margin: 0 14px 8px;
+      padding: 6px 10px; border-radius: var(--radius-sm);
+      background: #fffbeb; border: 1px solid #fde68a;
+      color: #92400e; font-size: .7rem; line-height: 1.4; flex-shrink: 0;
+    }
+    .noise-warning.visible { display: block; }
+
+    .transcript-area {
+      flex: 1; overflow-y: auto; padding: 13px 16px;
+      font-size: .845rem; line-height: 1.72; color: var(--slate);
+    }
+    .placeholder { color: var(--dim); font-style: italic; }
+    .interim     { color: var(--dim); font-style: italic; }
+
+    .timer-bar {
+      padding: 5px 14px; border-top: 1px solid var(--border-2);
+      font-size: .68rem; color: var(--muted);
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+      background: var(--white);
+    }
+    .timer-progress { flex:1; height:2px; background:var(--border-2); border-radius:1px; overflow:hidden; }
+    .timer-fill { height:100%; background:linear-gradient(90deg,var(--blue),#38bdf8); border-radius:1px; width:0%; transition:width 1s linear; }
+
+    /* ─── Paste ─── */
+    .paste-info {
+      padding: 9px 14px; border-bottom: 1px solid var(--border-2);
+      background: #eff6ff; font-size: .72rem; color: #1e40af; line-height: 1.5; flex-shrink: 0;
+    }
+    .paste-info strong { display: block; margin-bottom: 2px; }
+    .paste-area { flex:1; padding:11px 14px; display:flex; flex-direction:column; gap:7px; overflow:hidden; }
+    .paste-textarea {
+      flex:1; width:100%;
+      background: var(--white); border: 1.5px solid var(--border); border-radius: var(--radius-md);
+      padding: 10px 12px; font-size: .83rem; line-height: 1.65; color: var(--slate);
+      resize: none; font-family: var(--font); outline: none;
+      transition: border-color var(--tr), box-shadow var(--tr);
+    }
+    .paste-textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-glow); }
+    .paste-textarea::placeholder { color: var(--dim); font-style: italic; }
+    .paste-char-count { font-size: .65rem; color: var(--dim); text-align: right; }
+
+    /* ─── Buttons ─── */
+    .btn-group {
+      padding: 10px 14px; display: flex; gap: 6px;
+      border-top: 1px solid var(--border-2); background: var(--white); flex-shrink: 0;
+    }
+    .btn {
+      flex:1; padding: 8px 5px;
+      border: 1px solid transparent; border-radius: var(--radius-md);
+      font-size: .74rem; font-weight: 600; cursor: pointer;
+      transition: all var(--tr);
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      font-family: var(--font); letter-spacing: -.01em;
+    }
+    .btn:disabled { opacity: .35; cursor: not-allowed; }
+    .btn:not(:disabled):active { transform: scale(.97); }
+
+    .btn-start {
+      background: linear-gradient(135deg, #15803d 0%, #22c55e 100%);
+      border-color: rgba(34,197,94,.3); color: #fff;
+      box-shadow: 0 2px 10px rgba(22,163,74,.22);
+    }
+    .btn-start:not(:disabled):hover { filter: brightness(1.08); box-shadow: 0 2px 14px rgba(22,163,74,.32); }
+
+    .btn-stop {
+      background: linear-gradient(135deg, #b91c1c 0%, #ef4444 100%);
+      border-color: rgba(239,68,68,.3); color: #fff;
+      box-shadow: 0 2px 10px rgba(220,38,38,.18);
+    }
+    .btn-stop:not(:disabled):hover { filter: brightness(1.08); }
+
+    .btn-visualize {
+      background: linear-gradient(135deg, var(--navy) 0%, #004fa0 50%, var(--blue) 100%);
+      border-color: rgba(0,119,200,.3); color: #fff;
+      box-shadow: 0 2px 12px rgba(0,42,92,.28);
+    }
+    .btn-visualize:not(:disabled):hover { filter: brightness(1.09); box-shadow: 0 2px 18px rgba(0,119,200,.32); }
+
+    .btn-clear {
+      background: var(--surface-2); border-color: var(--border);
+      color: var(--muted); flex: .55;
+    }
+    .btn-clear:not(:disabled):hover { background: var(--border); color: var(--slate); }
+
+    /* ─── Viz container ─── */
+    .viz-container { flex:1; overflow-y:auto; padding:20px; }
+
+    /* Empty state */
+    .empty-state {
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      height:100%; text-align:center; gap:15px; color:var(--muted);
+    }
+    .empty-icon-wrap {
+      width: 62px; height: 62px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.55rem; box-shadow: var(--shadow-sm);
+    }
+    .empty-state h3 { font-size: .9rem; font-weight: 700; color: var(--slate); letter-spacing: -.01em; }
+    .empty-state p  { font-size: .78rem; max-width: 272px; line-height: 1.65; color: var(--muted); }
+    .viz-chips { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; max-width: 300px; }
+    .vchip {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 20px; padding: 3px 10px;
+      font-size: .67rem; font-weight: 600; color: var(--muted);
+    }
+
+    /* Loading */
+    .loading-state {
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      height:100%; gap:16px; color:var(--muted);
+    }
+    .spinner-ring { width: 38px; height: 38px; position: relative; }
+    .spinner-ring::before, .spinner-ring::after {
+      content:''; position:absolute; inset:0; border-radius:50%; border:2.5px solid transparent;
+    }
+    .spinner-ring::before { border-top-color:var(--navy); border-right-color:var(--blue); animation:spin .9s linear infinite; }
+    .spinner-ring::after  { border-bottom-color:var(--border); animation:spin .9s linear infinite reverse; inset:6px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .loading-state .lt { font-size:.86rem; font-weight:600; color:var(--slate); }
+    .loading-state .ls { font-size:.73rem; color:var(--muted); margin-top:-9px; }
+
+    /* Error */
+    .error-box {
+      background:#fef2f2; border:1px solid #fecaca; border-radius:var(--radius-lg);
+      padding:16px; color:#991b1b; font-size:.84rem; line-height:1.6;
+    }
+    .error-box strong { display:block; margin-bottom:5px; }
+
+    /* Output */
+    .viz-output { animation: fadeUp .36s cubic-bezier(.4,0,.2,1); }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(7px); } to { opacity:1; transform:none; } }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--dim); }
+
+    /* ─── Login overlay ─── */
+    .login-overlay {
+      position: fixed; inset: 0; z-index: 300;
+      background: #f4f7fd;
+      background-image:
+        radial-gradient(ellipse 50% 40% at 90% 0%, rgba(0,119,200,.045) 0%, transparent 55%),
+        radial-gradient(circle, rgba(0,50,120,.032) 1px, transparent 1px);
+      background-size: auto, 28px 28px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .login-overlay.hidden { display: none; }
+    .login-card {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 20px; box-shadow: var(--shadow-lg);
+      padding: 40px 36px; width: 380px; max-width: 94vw;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .login-brand {
+      width: 46px; height: 46px;
+      background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+      border-radius: 11px; display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; font-weight: 700; color: #fff;
+      box-shadow: 0 4px 14px rgba(0,42,92,.28); margin-bottom: 18px;
+    }
+    .login-title { font-size: 1.1rem; font-weight: 700; color: var(--ink); letter-spacing: -.02em; margin-bottom: 4px; }
+    .login-sub { font-size: .75rem; color: var(--muted); margin-bottom: 28px; }
+    .login-label { width: 100%; font-size: .72rem; font-weight: 600; color: var(--slate); margin-bottom: 6px; }
+    .login-input {
+      width: 100%; padding: 11px 14px; margin-bottom: 12px;
+      background: var(--white); border: 1.5px solid var(--border);
+      border-radius: var(--radius-md); font-size: .95rem; color: var(--ink);
+      font-family: var(--font); outline: none;
+      transition: border-color var(--tr), box-shadow var(--tr);
+    }
+    .login-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-glow); }
+    .login-input::placeholder { color: var(--dim); font-style: italic; font-size: .87rem; }
+    .login-join-info {
+      width: 100%; background: var(--blue-soft); border: 1px solid rgba(0,119,200,.18);
+      border-radius: var(--radius-md); padding: 9px 12px; margin-bottom: 18px;
+      font-size: .73rem; color: #1e40af; display: none;
+    }
+    .login-join-info.visible { display: block; }
+    .btn-login {
+      width: 100%; padding: 11px;
+      background: linear-gradient(135deg, var(--navy) 0%, #004fa0 50%, var(--blue) 100%);
+      border: 1px solid rgba(0,119,200,.3); color: #fff;
+      border-radius: var(--radius-md); font-size: .88rem; font-weight: 700;
+      cursor: pointer; font-family: var(--font); transition: all var(--tr);
+      box-shadow: 0 2px 12px rgba(0,42,92,.28); letter-spacing: -.01em;
+    }
+    .btn-login:hover { filter: brightness(1.1); }
+    .btn-login:active { transform: scale(.98); }
+
+    /* ─── Room bar ─── */
+    .room-bar {
+      height: 36px; padding: 0 18px;
+      background: var(--surface); border-bottom: 1px solid var(--border-2);
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+      font-size: .69rem;
+    }
+    .room-label { color: var(--dim); font-weight: 500; }
+    .room-code {
+      font-weight: 700; color: var(--navy); font-size: .78rem;
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 6px; padding: 2px 9px; letter-spacing: .1em;
+      font-family: 'Courier New', monospace;
+    }
+    .btn-room-share {
+      display: flex; align-items: center; gap: 4px;
+      background: transparent; border: none; cursor: pointer;
+      color: var(--blue); font-size: .67rem; font-weight: 600;
+      font-family: var(--font); padding: 2px 6px; border-radius: 4px;
+      transition: background var(--tr);
+    }
+    .btn-room-share:hover { background: var(--blue-soft); }
+    .room-sep { width: 1px; height: 16px; background: var(--border); }
+    .room-participants { display: flex; align-items: center; gap: 5px; flex: 1; flex-wrap: wrap; }
+    .participant-chip {
+      display: flex; align-items: center; gap: 4px;
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 20px; padding: 2px 8px 2px 5px;
+      font-size: .63rem; font-weight: 600; color: var(--slate);
+      animation: fadeUp .2s ease;
+    }
+    .participant-chip .p-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+    .participant-chip.me { border-color: rgba(0,119,200,.3); color: var(--blue); background: var(--blue-soft); }
+    .participant-chip.me .p-dot { background: var(--blue); }
+
+    /* ─── Attributed transcript ─── */
+    .seg-block { display: flex; gap: 8px; margin-bottom: 9px; align-items: flex-start; }
+    .seg-avatar {
+      width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+      background: var(--surface-2); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .55rem; font-weight: 700; color: var(--muted); margin-top: 2px;
+    }
+    .seg-avatar.mine { background: var(--blue-soft); border-color: rgba(0,119,200,.3); color: var(--blue); }
+    .seg-content { flex: 1; }
+    .seg-name { font-size: .65rem; font-weight: 700; color: var(--muted); margin-bottom: 1px; display: block; }
+    .seg-name.mine { color: var(--blue); }
+    .seg-text { font-size: .845rem; line-height: 1.65; color: var(--slate); }
+
+    /* ─── History button ─── */
+    .btn-history {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 5px 11px;
+      font-size: .72rem; font-weight: 600; color: var(--muted);
+      cursor: pointer; font-family: var(--font); transition: var(--tr);
+    }
+    .btn-history:hover { background: var(--surface-2); color: var(--slate); border-color: var(--dim); }
+    .btn-history .hist-count {
+      background: var(--navy); color: #fff;
+      border-radius: 10px; padding: 1px 6px; font-size: .6rem; font-weight: 700;
+      display: none;
+    }
+    .btn-history .hist-count.visible { display: inline; }
+
+    /* ─── History drawer ─── */
+    .drawer-overlay {
+      position: fixed; inset: 0; background: rgba(0,20,60,.32);
+      opacity: 0; pointer-events: none; transition: opacity .22s ease; z-index: 100;
+      backdrop-filter: blur(2px);
+    }
+    .drawer-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .history-drawer {
+      position: fixed; top: 0; right: 0; bottom: 0;
+      width: 360px; max-width: 92vw;
+      background: var(--white); border-left: 1px solid var(--border);
+      box-shadow: -8px 0 32px rgba(0,30,80,.12);
+      display: flex; flex-direction: column;
+      transform: translateX(100%); transition: transform .26s cubic-bezier(.4,0,.2,1);
+      z-index: 101;
+    }
+    .history-drawer.open { transform: translateX(0); }
+
+    .drawer-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border-2);
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+    }
+    .drawer-header h2 { font-size: .85rem; font-weight: 700; color: var(--ink); flex: 1; letter-spacing: -.01em; }
+    .btn-drawer-close {
+      width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+      border: none; background: var(--surface); border-radius: 6px; cursor: pointer;
+      font-size: .9rem; color: var(--muted); transition: var(--tr);
+    }
+    .btn-drawer-close:hover { background: var(--surface-2); color: var(--ink); }
+
+    .drawer-body { flex: 1; overflow-y: auto; padding: 8px 0; }
+
+    .hist-item {
+      padding: 10px 16px; cursor: pointer; transition: background var(--tr);
+      border-bottom: 1px solid var(--border-2);
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .hist-item:last-child { border-bottom: none; }
+    .hist-item:hover { background: var(--surface); }
+    .hist-item-icon {
+      width: 30px; height: 30px; flex-shrink: 0;
+      background: var(--blue-soft); border: 1px solid rgba(0,119,200,.15);
+      border-radius: 7px; display: flex; align-items: center; justify-content: center;
+      font-size: .8rem; margin-top: 1px;
+    }
+    .hist-item-body { flex: 1; min-width: 0; }
+    .hist-item-date { font-size: .63rem; color: var(--dim); font-weight: 500; margin-bottom: 2px; }
+    .hist-item-preview {
+      font-size: .76rem; color: var(--slate); line-height: 1.5;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .hist-item-actions { display: flex; gap: 4px; flex-shrink: 0; margin-top: 2px; }
+    .btn-hist-action {
+      width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+      border: none; background: transparent; border-radius: 5px; cursor: pointer;
+      font-size: .7rem; color: var(--dim); transition: var(--tr);
+    }
+    .btn-hist-action:hover { background: var(--surface-2); color: var(--ink); }
+    .btn-hist-action.del:hover { background: var(--red-soft); color: var(--red); }
+
+    .hist-empty {
+      padding: 40px 20px; text-align: center;
+      color: var(--dim); font-size: .78rem; line-height: 1.6;
+    }
+    .hist-empty-icon { font-size: 2rem; margin-bottom: 10px; }
+
+    .drawer-footer {
+      padding: 10px 16px; border-top: 1px solid var(--border-2);
+      font-size: .64rem; color: var(--dim); text-align: center; flex-shrink: 0;
+    }
+
+    /* Share toast */
+    .share-toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(10px);
+      background: var(--navy); color: #fff;
+      padding: 8px 18px; border-radius: 20px; font-size: .76rem; font-weight: 600;
+      opacity: 0; pointer-events: none; transition: all .22s ease; z-index: 200;
+      box-shadow: 0 4px 16px rgba(0,30,80,.25);
+    }
+    .share-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* Meeting ID badge in viz panel header */
+    .meeting-id-badge {
+      font-size: .6rem; color: var(--dim); font-weight: 500; font-family: monospace;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 4px; padding: 1px 6px; margin-left: 6px;
+      display: none;
+    }
+    .meeting-id-badge.visible { display: inline; }
+
+    /* ─── Viz type selector ─── */
+    .viz-options-strip {
+      padding: 7px 14px 0; display: flex; gap: 6px; align-items: center; flex-shrink: 0;
+    }
+    .viz-type-label { font-size: .63rem; font-weight: 600; color: var(--dim); white-space: nowrap; }
+    .viz-type-select {
+      flex: 1; padding: 5px 8px; border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm); font-size: .72rem; font-weight: 600;
+      color: var(--slate); background: var(--surface); font-family: var(--font);
+      cursor: pointer; outline: none; transition: border-color var(--tr);
+    }
+    .viz-type-select:focus { border-color: var(--blue); }
+
+    /* ─── Meeting title input ─── */
+    .title-strip {
+      padding: 6px 14px 0; flex-shrink: 0;
+    }
+    .title-input {
+      width: 100%; padding: 6px 10px;
+      border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+      font-size: .78rem; color: var(--ink); background: var(--surface);
+      font-family: var(--font); outline: none; transition: border-color var(--tr), box-shadow var(--tr);
+    }
+    .title-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-glow); background: var(--white); }
+    .title-input::placeholder { color: var(--dim); font-style: italic; font-size: .75rem; }
+
+    /* ─── Transcript edit mode ─── */
+    .edit-mode-bar {
+      display: none; padding: 6px 14px;
+      background: #eff6ff; border-bottom: 1px solid #bfdbfe;
+      align-items: center; gap: 8px; flex-shrink: 0;
+    }
+    .edit-mode-bar.visible { display: flex; }
+    .edit-mode-bar span { font-size: .72rem; color: #1e40af; font-weight: 600; flex: 1; }
+    .btn-edit-save   { padding: 4px 12px; border-radius: var(--radius-sm); border: none; cursor: pointer; font-family: var(--font); font-size: .72rem; font-weight: 700; background: var(--blue); color: #fff; }
+    .btn-edit-cancel { padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); cursor: pointer; font-family: var(--font); font-size: .72rem; background: var(--white); color: var(--muted); }
+    .transcript-edit-area {
+      flex: 1; padding: 13px 16px;
+      font-size: .845rem; line-height: 1.72; color: var(--slate);
+      border: none; outline: none; resize: none; font-family: var(--font);
+      background: #eff6ff; display: none;
+    }
+    .transcript-edit-area.visible { display: block; }
+
+    /* ─── Reconnect banner ─── */
+    .reconnect-banner {
+      display: none; position: fixed; top: 52px; left: 50%; transform: translateX(-50%);
+      background: #7c3aed; color: #fff; border-radius: 0 0 10px 10px;
+      padding: 6px 20px; font-size: .72rem; font-weight: 600; z-index: 50;
+      box-shadow: 0 4px 14px rgba(124,58,237,.3); animation: fadeIn .2s ease;
+    }
+    .reconnect-banner.visible { display: block; }
+
+    /* ─── Fullscreen mode ─── */
+    .viz-container:fullscreen {
+      background: #0d1421; overflow-y: auto;
+      padding: 32px; display: flex; align-items: flex-start; justify-content: center;
+    }
+    .viz-container:-webkit-full-screen { background: #0d1421; overflow-y: auto; padding: 32px; }
+    body.viz-fullscreen .viz-container {
+      position: fixed; inset: 0; z-index: 400; background: #0d1421;
+      overflow-y: auto; padding: 32px;
+    }
+    .btn-fs-exit {
+      display: none; position: fixed; top: 14px; right: 14px; z-index: 401;
+      background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.25);
+      color: #fff; border-radius: 6px; padding: 6px 14px; font-size: .72rem;
+      font-weight: 700; cursor: pointer; font-family: var(--font);
+    }
+    body.viz-fullscreen .btn-fs-exit { display: block; }
+
+    /* ─── Header action buttons (export, fullscreen, share) ─── */
+    .ph-actions { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+    .btn-ph-action {
+      width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+      border: 1px solid var(--border); background: var(--surface); border-radius: 6px;
+      cursor: pointer; font-size: .78rem; color: var(--muted); transition: var(--tr);
+    }
+    .btn-ph-action:hover { background: var(--surface-2); color: var(--slate); border-color: var(--dim); }
+    .btn-ph-action.active { background: var(--blue-soft); border-color: rgba(0,119,200,.3); color: var(--blue); }
+
+    /* ─── Edit button on transcript header ─── */
+    .btn-edit-transcript {
+      display: flex; align-items: center; gap: 4px;
+      background: transparent; border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 3px 9px;
+      font-size: .63rem; font-weight: 600; color: var(--dim);
+      cursor: pointer; font-family: var(--font); transition: var(--tr);
+    }
+    .btn-edit-transcript:hover { background: var(--surface-2); color: var(--slate); }
+
+    /* ─── Teams ─── */
+    body.teams-sidepanel .main        { flex-direction: column; }
+    body.teams-sidepanel .panel-left  { width: 100%; max-height: 42vh; }
+    body.teams-sidepanel .btn-share-stage { display: flex !important; }
+    body.teams-sidepanel .teams-badge     { display: inline-block !important; }
+    body.teams-stage .panel-left  { display: none; }
+    body.teams-stage .panel-right { width: 100%; }
+    body.teams-stage .teams-badge { display: inline-block !important; }
+    body.teams-stage .viz-container { padding: 28px; }
+    body.teams-content .teams-badge { display: inline-block !important; }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN OVERLAY -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-card">
+      <div class="login-brand">G</div>
+      <div class="login-title">Meeting AI · Grundfos</div>
+      <div class="login-sub" id="loginSub">Skriv dit navn for at deltage i mødet</div>
+      <label class="login-label" for="loginNameInput">Dit navn</label>
+      <input class="login-input" id="loginNameInput" type="text"
+        placeholder="f.eks. Jakob Pedersen"
+        autocomplete="name" autofocus
+        onkeydown="if(event.key==='Enter') doLogin()" />
+      <div class="login-join-info" id="loginJoinInfo"></div>
+      <button class="btn-login" onclick="doLogin()">Deltag i mødet →</button>
+    </div>
+  </div>
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="brand-mark">G</div>
+    <div class="topbar-title">
+      <h1>Meeting AI</h1>
+      <span class="sub">Grundfos · Claude AI</span>
+    </div>
+    <div class="topbar-sep"></div>
+    <div class="topbar-right">
+      <button class="btn-history" id="btnHistory" onclick="openHistory()" aria-label="Vis mødehistorik">
+        🕒 Historik
+        <span class="hist-count" id="histCount">0</span>
+      </button>
+      <div class="topbar-sep"></div>
+      <div class="rec-chip" id="recChip">
+        <span class="dot"></span>
+        <span id="recChipLabel">STANDBY</span>
+      </div>
+      <span class="teams-badge" id="teamsBadge">TEAMS</span>
+      <button class="btn-share-stage" id="btnShareStage" onclick="shareToStage()">↗ Del til scene</button>
+    </div>
+  </div>
+
+  <!-- ROOM BAR -->
+  <div class="room-bar" id="roomBar">
+    <span class="room-label">Møderum</span>
+    <span class="room-code" id="roomCodeDisplay">—</span>
+    <button class="btn-room-share" onclick="shareRoomLink()" title="Kopiér invite-link">
+      🔗 Del invite
+    </button>
+    <div class="room-sep"></div>
+    <div class="room-participants" id="roomParticipants"></div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- LEFT PANEL -->
+    <div class="panel panel-left">
+
+      <div class="panel-header">
+        <div class="ph-icon">📝</div>
+        <div class="ph-text">
+          <h2>Transskription</h2>
+          <div class="sub">Optag eller indsæt mødetekst</div>
+        </div>
+        <span class="word-badge" id="wordCountBadge">0 ord</span>
+        <button class="btn-edit-transcript" id="btnEditTranscript" onclick="toggleTranscriptEdit()" title="Rediger transskription">✎ Rediger</button>
+      </div>
+
+      <div class="tab-bar">
+        <div class="tab-inner">
+          <div class="tab-indicator" id="tabIndicator"></div>
+          <button class="tab-btn active" id="tabMic"   onclick="switchTab('mic')">🎤 Mikrofon</button>
+          <button class="tab-btn"        id="tabPaste" onclick="switchTab('paste')">📋 Indsæt tekst</button>
+        </div>
+      </div>
+
+      <!-- Title + viz type (shared, always visible) -->
+      <div class="title-strip">
+        <input class="title-input" id="titleInput" type="text" placeholder="Mødetitel (valgfrit)..." autocomplete="off" />
+      </div>
+      <div class="viz-options-strip">
+        <span class="viz-type-label">Type:</span>
+        <select class="viz-type-select" id="vizTypeSelect">
+          <option value="auto">Auto (Claude vælger)</option>
+          <option value="kanban">⊞ Kanban / Opgaveboard</option>
+          <option value="beslutningslog">≡ Beslutningslog</option>
+          <option value="kontrolpanel">◈ Kontrolpanel / HMI</option>
+          <option value="tidslinje">→ Tidslinje</option>
+          <option value="kravspec">✦ Kravspecifikation</option>
+          <option value="mindmap">⊙ Mindmap</option>
+          <option value="statusboard">⊟ Statusboard</option>
+          <option value="risikoregister">⚠ Risikoregister</option>
+        </select>
+      </div>
+
+      <!-- Mikrofon -->
+      <div class="tab-pane active" id="paneMic">
+        <div class="rec-row">
+          <div class="waveform">
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          </div>
+          <span class="rec-status-text" id="statusText">Klar — tryk "Start"</span>
+          <div class="quality-wrap" id="qualityBar">
+            <span>Lyd</span>
+            <div class="quality-track"><div class="quality-fill" id="qualityFill"></div></div>
+          </div>
+        </div>
+
+        <div class="noise-warning" id="noiseWarning">
+          ⚠ Lav lydkvalitet — flyt mikrofonen tættere på.
+        </div>
+
+        <div class="transcript-area" id="transcriptArea">
+          <p class="placeholder" id="placeholder">Din tale vises her, mens du taler...</p>
+        </div>
+
+        <div class="edit-mode-bar" id="editModeBar">
+          <span>✎ Redigeringstilstand</span>
+          <button class="btn-edit-save"   onclick="applyTranscriptEdit()">Gem</button>
+          <button class="btn-edit-cancel" onclick="cancelTranscriptEdit()">Annuller</button>
+        </div>
+        <textarea class="transcript-edit-area" id="transcriptEditArea"></textarea>
+
+        <div class="timer-bar" id="timerBar" style="display:none;">
+          <span>⏱ Auto om <strong id="countdown">30</strong>s</span>
+          <div class="timer-progress"><div class="timer-fill" id="timerFill"></div></div>
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn-start"     id="btnStart"    onclick="startRecording()">▶ Start</button>
+          <button class="btn btn-stop"      id="btnStop"     onclick="stopRecording()" disabled>⏹ Stop</button>
+          <button class="btn btn-clear"     id="btnClearMic" onclick="clearMic()">✕</button>
+          <button class="btn btn-visualize" id="btnVisualize" onclick="triggerVisualize()" disabled>✦ Visualisér</button>
+        </div>
+      </div>
+
+      <!-- Indsæt tekst -->
+      <div class="tab-pane" id="panePaste">
+        <div class="paste-info">
+          <strong>💡 Teams-transskription</strong>
+          Mere (…) → Start transskription → kopiér og indsæt her.
+        </div>
+        <div class="paste-area">
+          <textarea class="paste-textarea" id="pasteInput"
+            placeholder="Indsæt Teams-transskription eller mødereferat her..."
+            oninput="updateCharCount()"></textarea>
+          <div class="paste-char-count" id="charCount">0 tegn</div>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-clear"     onclick="clearPaste()">✕ Ryd</button>
+          <button class="btn btn-visualize" onclick="triggerVisualize()">✦ Visualisér</button>
+        </div>
+      </div>
+
+    </div><!-- /panel-left -->
+
+    <!-- RIGHT PANEL -->
+    <div class="panel panel-right">
+
+      <div class="panel-header">
+        <div class="ph-icon purple">✦</div>
+        <div class="ph-text">
+          <h2>AI Visualisering</h2>
+          <div class="sub" id="vizPanelSub">Genereret af Claude · Grundfos</div>
+        </div>
+        <span class="meeting-id-badge" id="meetingIdBadge"></span>
+        <div class="ph-actions">
+          <button class="btn-ph-action" id="btnShareMeeting" title="Kopier delings-link" onclick="shareCurrentMeeting()" style="display:none;">🔗</button>
+          <button class="btn-ph-action" id="btnExportViz"    title="Eksportér som HTML-fil" onclick="exportVisualization()">↓</button>
+          <button class="btn-ph-action" id="btnFullscreen"   title="Fuldskærm" onclick="toggleFullscreen()">⛶</button>
+        </div>
+      </div>
+
+      <div class="viz-container" id="vizContainer">
+        <div class="empty-state">
+          <div class="empty-icon-wrap">🧠</div>
+          <h3>Ingen visualisering endnu</h3>
+          <p>Optag tale eller indsæt tekst fra Teams — Claude genererer automatisk en visualisering af mødet.</p>
+          <div class="viz-chips">
+            <span class="vchip">⊞ Kanban</span>
+            <span class="vchip">≡ Beslutningslog</span>
+            <span class="vchip">◈ Kontrolpanel</span>
+            <span class="vchip">→ Tidslinje</span>
+            <span class="vchip">✦ Kravspec.</span>
+            <span class="vchip">⊙ Mindmap</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /panel-right -->
+
+  </div><!-- /.main -->
+
+  <!-- HISTORY DRAWER -->
+  <div class="drawer-overlay" id="drawerOverlay" onclick="closeHistory()"></div>
+  <div class="history-drawer" id="historyDrawer" role="dialog" aria-label="Mødehistorik">
+    <div class="drawer-header">
+      <div class="ph-icon" style="flex-shrink:0;">🕒</div>
+      <h2>Mødehistorik</h2>
+      <button class="btn-drawer-close" onclick="closeHistory()" aria-label="Luk">✕</button>
+    </div>
+    <div class="drawer-body" id="drawerBody">
+      <div class="hist-empty"><div class="hist-empty-icon">📋</div>Ingen møder gemt endnu.<br>Klik "Visualisér" for at gemme et møde.</div>
+    </div>
+    <div class="drawer-footer">Møder gemmes lokalt på serveren</div>
+  </div>
+
+  <!-- SHARE TOAST -->
+  <div class="share-toast" id="shareToast">✓ Link kopieret til udklipsholder</div>
+
+  <!-- RECONNECT BANNER -->
+  <div class="reconnect-banner" id="reconnectBanner">🔄 Forbinder til møderum igen...</div>
+
+  <!-- FULLSCREEN EXIT BUTTON -->
+  <button class="btn-fs-exit" id="btnFsExit" onclick="exitFullscreen()">✕ Afslut fuldskærm</button>
+
+  <script>
+    const AUTO_INTERVAL = 30;
+    let recognition = null, isRecording = false;
+    let fullTranscript = '', interimText = '';
+    let countdown = AUTO_INTERVAL, countdownInterval = null;
+    let activeTab = 'mic';
+    let recentConfidences = [], lowConfCount = 0;
+    const CONF_THRESHOLD = 0.38, LOW_CONF_WARN = 4;
+    let isInTeams = false, teamsFrame = 'content';
+    let currentMeetingId = null;
+
+    // ── User / Room state ──────────────────────────────────────────────────────
+    let userName      = null;     // set after login
+    let currentRoomId = null;     // active room code
+    let sseSource     = null;     // EventSource
+    let roomSegments  = [];       // [{name, text, isMine}] — attributed transcript
+
+    const statusText   = document.getElementById('statusText');
+    const transcriptEl = document.getElementById('transcriptArea');
+    const timerBar     = document.getElementById('timerBar');
+    const countdownEl  = document.getElementById('countdown');
+    const timerFill    = document.getElementById('timerFill');
+    const btnStart     = document.getElementById('btnStart');
+    const btnStop      = document.getElementById('btnStop');
+    const btnVisualize = document.getElementById('btnVisualize');
+    const vizContainer = document.getElementById('vizContainer');
+    const pasteInput   = document.getElementById('pasteInput');
+    const qualityBar   = document.getElementById('qualityBar');
+    const qualityFill  = document.getElementById('qualityFill');
+    const noiseWarning = document.getElementById('noiseWarning');
+    const recChip        = document.getElementById('recChip');
+    const recChipLabel   = document.getElementById('recChipLabel');
+    const wordBadge      = document.getElementById('wordCountBadge');
+    const tabIndicator   = document.getElementById('tabIndicator');
+    const loginOverlay    = document.getElementById('loginOverlay');
+    const loginNameInput  = document.getElementById('loginNameInput');
+    const loginJoinInfo   = document.getElementById('loginJoinInfo');
+    const loginSub        = document.getElementById('loginSub');
+    const roomCodeDisplay = document.getElementById('roomCodeDisplay');
+    const roomParticipants = document.getElementById('roomParticipants');
+    const drawerOverlay  = document.getElementById('drawerOverlay');
+    const historyDrawer  = document.getElementById('historyDrawer');
+    const drawerBody     = document.getElementById('drawerBody');
+    const histCount      = document.getElementById('histCount');
+    const meetingIdBadge  = document.getElementById('meetingIdBadge');
+    const shareToastEl    = document.getElementById('shareToast');
+
+    // Teams
+    (async function initTeams() {
+      try {
+        await microsoftTeams.app.initialize();
+        const ctx = await microsoftTeams.app.getContext();
+        isInTeams = true; teamsFrame = ctx?.page?.frameContext || 'content';
+        applyTeamsLayout();
+      } catch (_) {}
+    })();
+    function applyTeamsLayout() {
+      document.body.classList.remove('teams-sidepanel','teams-stage','teams-content');
+      if      (teamsFrame === 'sidePanel')    document.body.classList.add('teams-sidepanel');
+      else if (teamsFrame === 'meetingStage') document.body.classList.add('teams-stage');
+      else                                    document.body.classList.add('teams-content');
+    }
+    function shareToStage() {
+      if (!isInTeams) return;
+      microsoftTeams.meeting.shareAppContentToStage(
+        e => { if (e) console.error(e); },
+        window.location.origin + '/index.html'
+      );
+    }
+
+    // Tabs
+    function switchTab(tab) {
+      activeTab = tab;
+      document.getElementById('tabMic').classList.toggle('active',   tab === 'mic');
+      document.getElementById('tabPaste').classList.toggle('active', tab === 'paste');
+      document.getElementById('paneMic').classList.toggle('active',   tab === 'mic');
+      document.getElementById('panePaste').classList.toggle('active', tab === 'paste');
+      tabIndicator.classList.toggle('paste', tab === 'paste');
+      updateWordBadge();
+    }
+    function updateCharCount() { document.getElementById('charCount').textContent = pasteInput.value.length.toLocaleString('da-DK') + ' tegn'; updateWordBadge(); }
+    function clearPaste() { pasteInput.value = ''; updateCharCount(); }
+    function clearMic() {
+      if (isRecording) stopRecording();
+      fullTranscript = ''; interimText = ''; roomSegments = [];
+      transcriptEl.innerHTML = '<p class="placeholder" id="placeholder">Din tale vises her, mens du taler...</p>';
+      btnVisualize.disabled = true;
+      recentConfidences = []; lowConfCount = 0;
+      qualityBar.classList.remove('visible'); noiseWarning.classList.remove('visible');
+      updateWordBadge();
+    }
+    function updateWordBadge() {
+      const t = activeTab === 'mic' ? fullTranscript : pasteInput.value;
+      wordBadge.textContent = (t.trim() ? t.trim().split(/\s+/).length : 0) + ' ord';
+    }
+
+    // Browser check
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      btnStart.disabled = true;
+      transcriptEl.innerHTML = `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:18px;color:#92400e;text-align:center;font-size:.82rem">
+        <div style="font-size:1.8rem;margin-bottom:8px">⚠️</div>
+        <strong style="display:block;margin-bottom:5px">Mikrofon ikke tilgængelig</strong>
+        Åbn i <strong>Chrome</strong> eller <strong>Edge</strong> for live-transskription,<br>
+        eller brug <strong>"Indsæt tekst"</strong> med Teams-transskription.
+      </div>`;
+    } else { setupRecognition(); }
+
+    function setupRecognition() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SR();
+      recognition.continuous = true; recognition.interimResults = true;
+      recognition.lang = 'da-DK'; recognition.maxAlternatives = 3;
+      recognition.onresult = e => {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const r = e.results[i], t = r[0].transcript, c = r[0].confidence || 0;
+          if (r.isFinal) {
+            // 0) Normaliser regulatoriske akronymer FØR al anden behandling
+            const normalized = normalizeRegulatoryTerms(t.trim());
+            const wc = normalized.split(/\s+/).filter(w => w.length > 1).length;
+            if (c > 0 && c < CONF_THRESHOLD && wc <= 2) { updateQuality(c, true); continue; }
+            const cl = removeDanishFillers(normalized);
+            if (cl.replace(/\s+/g,'').length < 2) { updateQuality(c, true); continue; }
+            if (isHallucination(normalized, fullTranscript)) {
+              setStatus('⚠ Gentaget tekst filtreret');
+              setTimeout(() => setStatus('Optager...'), 2000); continue;
+            }
+            // Add to attributed room transcript
+            roomSegments.push({ name: userName || 'Mig', text: normalized, isMine: true });
+            fullTranscript += normalized + ' ';
+            updateQuality(c, false); updateWordBadge();
+            postSegment(normalized); // broadcast to room
+          } else { interim += t; }
+        }
+        interimText = interim; renderRoomTranscript(interim);
+      };
+      recognition.onerror = e => { if (e.error !== 'no-speech') setStatus('Fejl: ' + e.error); };
+      recognition.onend = () => { if (isRecording) recognition.start(); };
+    }
+
+    // ── Regulatoriske akronym-korrektioner ────────────────────────────────────
+    // Dansk ASR misfortolker "CER" → "sær" / "CR", "NIS2" → "NIS 2" / "nice to" osv.
+    // Denne funktion normaliserer alle kendte forvekslinger til korrekte begreber.
+    function normalizeRegulatoryTerms(t) {
+      return t
+        // CER — udtalt "C-E-R" høres som "sær", "seer", "CR", "C R", "cear"
+        .replace(/\bsær\b/gi,                      'CER')
+        .replace(/\bseer\b/gi,                     'CER')
+        .replace(/\bcear\b/gi,                     'CER')
+        .replace(/\bC[\.\s]?R\b/g,                 'CER')   // "CR" eller "C.R."
+        .replace(/\bc[\.\s]e[\.\s]r\b/gi,          'CER')   // "c.e.r" / "c e r"
+
+        // NIS2 — høres som "NIS 2", "nice 2", "nice to", "niis2"
+        .replace(/\bNIS[\s\-]?2\b/gi,              'NIS2')
+        .replace(/\bniis\s*2?\b/gi,                'NIS2')
+        .replace(/\bnice\s+to\b/gi,                'NIS2')  // "nice to" i regulatorisk kontekst
+        .replace(/\bN[\.\s]I[\.\s]S[\.\s]2\b/gi,  'NIS2')
+
+        // IEC 62443 — høres som "IEC 6 2 4 4 3" eller "IEC seksogtreds"
+        .replace(/\bIEC[\s\-]?6\s*2\s*4\s*4\s*3\b/gi, 'IEC 62443')
+
+        // ISO 27001 — høres som "ISO 2 7 0 0 1"
+        .replace(/\bISO[\s\-]?2\s*7\s*0\s*0\s*1\b/gi, 'ISO 27001')
+
+        // GDPR — normalt korrekt, men kan blive "GD PR" eller "GDPR"
+        .replace(/\bGD\s+PR\b/gi,                  'GDPR')
+
+        // SCADA / HMI / PLC — disse forveksles sjældent men normalisér store bogstaver
+        .replace(/\bscada\b/gi,                    'SCADA')
+        .replace(/\bplc\b/gi,                      'PLC')
+        .replace(/\bhmi\b/gi,                      'HMI')
+
+        .replace(/\s{2,}/g, ' ').trim();
+    }
+
+    function removeDanishFillers(t) {
+      return t.replace(/\b(øh+m?|øhm|altså|nå|nå men|ja ja|ja ja ja|ikk|mm+|hmm+)\b/gi,'').replace(/\s{2,}/g,' ').trim();
+    }
+    function isHallucination(newText, existing) {
+      const words = newText.trim().split(/\s+/);
+      if (words.length < 5) return false;
+      const phrase = words.slice(0,6).join(' ').toLowerCase().replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      return ((existing.toLowerCase().match(new RegExp(phrase,'g')) || []).length) >= 3;
+    }
+    function updateQuality(conf, isLow) {
+      qualityBar.classList.add('visible');
+      recentConfidences.push(conf);
+      if (recentConfidences.length > 8) recentConfidences.shift();
+      const avg = recentConfidences.reduce((a,b) => a+b,0) / recentConfidences.length;
+      qualityFill.style.width = Math.round(avg*100) + '%';
+      qualityFill.className = 'quality-fill' + (avg<.45?' low':avg<.65?' medium':'');
+      if (isLow) { if (++lowConfCount >= LOW_CONF_WARN) noiseWarning.classList.add('visible'); }
+      else       { if ((lowConfCount = Math.max(0,lowConfCount-1)) < LOW_CONF_WARN) noiseWarning.classList.remove('visible'); }
+    }
+    function renderTranscript() {
+      const ph = document.getElementById('placeholder'); if (ph) ph.remove();
+      transcriptEl.innerHTML = `<span style="white-space:pre-wrap">${esc(fullTranscript)}</span>` +
+        (interimText ? `<span class="interim">${esc(interimText)}</span>` : '');
+      transcriptEl.scrollTop = transcriptEl.scrollHeight;
+    }
+    function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // Recording
+    function startRecording() {
+      if (!recognition) return;
+      isRecording = true; recognition.start();
+      btnStart.disabled = true; btnStop.disabled = false; btnVisualize.disabled = false;
+      setStatus('Optager...');
+      document.body.classList.add('recording');
+      recChip.classList.add('active'); recChipLabel.textContent = 'OPTAGER';
+      startTimer();
+    }
+    function stopRecording() {
+      isRecording = false; recognition.stop();
+      btnStart.disabled = false; btnStop.disabled = true;
+      setStatus('Stoppet');
+      document.body.classList.remove('recording');
+      recChip.classList.remove('active'); recChipLabel.textContent = 'STANDBY';
+      stopTimer();
+      recentConfidences = []; lowConfCount = 0;
+      qualityBar.classList.remove('visible'); noiseWarning.classList.remove('visible');
+    }
+    function setStatus(text) { statusText.textContent = text; }
+    function startTimer() {
+      timerBar.style.display = 'flex';
+      countdown = AUTO_INTERVAL; countdownEl.textContent = countdown; timerFill.style.width = '0%';
+      countdownInterval = setInterval(() => {
+        countdown--; countdownEl.textContent = countdown;
+        timerFill.style.width = (((AUTO_INTERVAL-countdown)/AUTO_INTERVAL)*100) + '%';
+        if (countdown <= 0) { triggerVisualize(); countdown = AUTO_INTERVAL; timerFill.style.width = '0%'; }
+      }, 1000);
+    }
+    function stopTimer() { clearInterval(countdownInterval); timerBar.style.display = 'none'; }
+
+    // Visualize — streaming SSE version
+    async function triggerVisualize() {
+      let text = '';
+      if (activeTab === 'mic') {
+        text = (fullTranscript + ' ' + interimText).trim();
+        if (!text) { showError('Ingen tekst endnu — start optagelse og tal!'); return; }
+        if (isRecording) { countdown = AUTO_INTERVAL; countdownEl.textContent = countdown; timerFill.style.width = '0%'; }
+      } else {
+        text = pasteInput.value.trim();
+        if (!text) { showError('Indsæt tekst fra Teams eller et referat før du visualiserer.'); return; }
+      }
+      showStreamLoading();
+      let accHtml = '';
+      let charCount = 0;
+      try {
+        const response = await fetch('/api/visualize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transcript: text,
+            roomId:     currentRoomId,
+            title:      document.getElementById('titleInput').value.trim() || null,
+            vizType:    document.getElementById('vizTypeSelect').value,
+          }),
+        });
+        if (!response.ok || !response.body) {
+          const err = await response.json().catch(() => ({}));
+          showError(err.error || 'Ukendt serverfejl.'); return;
+        }
+        const reader  = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop();
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.error)  { showError(data.error); return; }
+              if (data.chunk)  { accHtml += data.chunk; charCount += data.chunk.length; updateStreamProgress(charCount); }
+              if (data.done)   { showVisualization(accHtml, data.id, data.title); refreshHistCount(); }
+            } catch (_) {}
+          }
+        }
+      } catch (err) { showError('Netværksfejl: ' + err.message); }
+    }
+    function showStreamLoading() {
+      vizContainer.innerHTML = `<div class="loading-state" id="streamState">
+        <div class="spinner-ring"></div>
+        <div class="lt">Claude genererer visualisering...</div>
+        <div class="ls" id="streamProgress">Forbinder til Claude...</div>
+      </div>`;
+    }
+    function updateStreamProgress(chars) {
+      const el = document.getElementById('streamProgress');
+      if (el) el.textContent = chars.toLocaleString('da-DK') + ' tegn genereret';
+    }
+    function showVisualization(h, id, title) {
+      currentMeetingId = id || null;
+      vizContainer.innerHTML = `<div class="viz-output">${h}</div>`;
+      // Update subtitle with meeting title if available
+      if (vizPanelSub) {
+        vizPanelSub.textContent = title
+          ? `${title} · Claude`
+          : 'Genereret af Claude · Grundfos';
+      }
+      if (id) {
+        meetingIdBadge.textContent = id.slice(0,8) + '…';
+        meetingIdBadge.classList.add('visible');
+        document.getElementById('btnShareMeeting').style.display = 'flex';
+      } else {
+        meetingIdBadge.classList.remove('visible');
+        document.getElementById('btnShareMeeting').style.display = 'none';
+      }
+    }
+    function showError(msg) { vizContainer.innerHTML = `<div class="error-box"><strong>⚠ Fejl</strong>${esc(msg)}</div>`; }
+    // ── History drawer ────────────────────────────────────────────────────────
+    function openHistory() {
+      loadHistoryList();
+      drawerOverlay.classList.add('open');
+      historyDrawer.classList.add('open');
+    }
+    function closeHistory() {
+      drawerOverlay.classList.remove('open');
+      historyDrawer.classList.remove('open');
+    }
+
+    async function loadHistoryList() {
+      drawerBody.innerHTML = '<div class="hist-empty"><div class="hist-empty-icon" style="font-size:1.2rem">⏳</div>Henter historik...</div>';
+      try {
+        const res  = await fetch('/api/history');
+        const list = await res.json();
+        renderHistoryList(list);
+        // Update badge count
+        histCount.textContent = list.length;
+        histCount.classList.toggle('visible', list.length > 0);
+      } catch (err) {
+        drawerBody.innerHTML = `<div class="hist-empty">Kunne ikke hente historik.<br><small>${esc(err.message)}</small></div>`;
+      }
+    }
+
+    async function refreshHistCount() {
+      try {
+        const res  = await fetch('/api/history');
+        const list = await res.json();
+        histCount.textContent = list.length;
+        histCount.classList.toggle('visible', list.length > 0);
+      } catch (_) {}
+    }
+
+    function renderHistoryList(list) {
+      if (!list.length) {
+        drawerBody.innerHTML = '<div class="hist-empty"><div class="hist-empty-icon">📋</div>Ingen møder gemt endnu.<br>Klik "Visualisér" for at gemme et møde.</div>';
+        return;
+      }
+      drawerBody.innerHTML = list.map(m => {
+        const d = new Date(m.timestamp);
+        const dateStr = d.toLocaleDateString('da-DK', { day:'2-digit', month:'short', year:'numeric' })
+                      + ' ' + d.toLocaleTimeString('da-DK', { hour:'2-digit', minute:'2-digit' });
+        const titleLine = m.title
+          ? `<div class="hist-item-preview" style="font-weight:600;color:var(--ink)">${esc(m.title)}</div>
+             <div class="hist-item-preview" style="font-size:.68rem;margin-top:1px">${esc(m.transcript_preview || '')}</div>`
+          : `<div class="hist-item-preview">${esc(m.transcript_preview || '–')}</div>`;
+        return `<div class="hist-item" onclick="openMeetingItem('${m.id}')">
+          <div class="hist-item-icon">📊</div>
+          <div class="hist-item-body">
+            <div class="hist-item-date">${esc(dateStr)}</div>
+            ${titleLine}
+          </div>
+          <div class="hist-item-actions" onclick="event.stopPropagation()">
+            <button class="btn-hist-action" title="Kopiér link" onclick="shareMeeting('${m.id}')">🔗</button>
+            <button class="btn-hist-action del" title="Slet" onclick="deleteMeetingItem('${m.id}', this)">🗑</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    async function openMeetingItem(id) {
+      closeHistory();
+      vizContainer.innerHTML = '<div class="loading-state"><div class="spinner-ring"></div><div class="lt">Henter møde...</div></div>';
+      try {
+        const res  = await fetch(`/api/meeting/${id}`);
+        if (!res.ok) { showError('Møde ikke fundet.'); return; }
+        const data = await res.json();
+        showVisualization(data.html, data.id, data.title);
+        // Push to URL without reload so it's shareable
+        history.replaceState(null, '', `?view=${id}`);
+      } catch (err) { showError('Netværksfejl: ' + err.message); }
+    }
+
+    async function deleteMeetingItem(id, btn) {
+      btn.textContent = '…';
+      try {
+        await fetch(`/api/meeting/${id}`, { method: 'DELETE' });
+        await loadHistoryList();
+        // If we're viewing this meeting, clear the panel
+        if (currentMeetingId === id) {
+          currentMeetingId = null;
+          vizContainer.innerHTML = '<div class="empty-state"><div class="empty-icon-wrap">🧠</div><h3>Visualisering slettet</h3><p>Start en ny optagelse eller vælg et andet møde fra historikken.</p></div>';
+          meetingIdBadge.classList.remove('visible');
+          document.getElementById('btnShareMeeting').style.display = 'none';
+          if (vizPanelSub) vizPanelSub.textContent = 'Genereret af Claude · Grundfos';
+          history.replaceState(null, '', '/');
+        }
+      } catch (err) { btn.textContent = '🗑'; alert('Fejl: ' + err.message); }
+    }
+
+    function shareMeeting(id) {
+      const url = `${location.origin}/?view=${id}`;
+      navigator.clipboard.writeText(url).then(() => showShareToast()).catch(() => {
+        prompt('Kopiér dette link:', url);
+      });
+    }
+
+    function shareCurrentMeeting() {
+      if (currentMeetingId) shareMeeting(currentMeetingId);
+    }
+
+    let shareToastTimer;
+    function showShareToast() {
+      shareToastEl.classList.add('visible');
+      clearTimeout(shareToastTimer);
+      shareToastTimer = setTimeout(() => shareToastEl.classList.remove('visible'), 2500);
+    }
+
+    // ── Login ──────────────────────────────────────────────────────────────────
+    function doLogin() {
+      const name = loginNameInput.value.trim();
+      if (!name) { loginNameInput.focus(); loginNameInput.style.borderColor='var(--red)'; return; }
+      loginNameInput.style.borderColor = '';
+      userName = name;
+      localStorage.setItem('gf_user_name', name);
+      loginOverlay.classList.add('hidden');
+      initRoom();
+    }
+
+    // ── Room init ──────────────────────────────────────────────────────────────
+    async function initRoom() {
+      const params = new URLSearchParams(location.search);
+      const roomParam = params.get('room');
+      if (roomParam && /^[A-Z0-9]{6}$/.test(roomParam)) {
+        await joinRoom(roomParam);
+      } else {
+        await createAndJoinRoom();
+      }
+      // Also check ?view= for saved meeting display
+      const viewId = params.get('view');
+      if (viewId && /^[a-f0-9\-]{36}$/.test(viewId)) {
+        await openMeetingItem(viewId);
+      }
+      refreshHistCount();
+    }
+
+    async function createAndJoinRoom() {
+      try {
+        const res  = await fetch('/api/room/create', { method: 'POST' });
+        const data = await res.json();
+        await joinRoom(data.id);
+      } catch (err) { console.error('Kunne ikke oprette møderum:', err); }
+    }
+
+    async function joinRoom(roomId) {
+      currentRoomId = roomId;
+      roomCodeDisplay.textContent = roomId;
+      history.replaceState(null, '', `?room=${roomId}`);
+      connectSSE(roomId);
+    }
+
+    // ── SSE ────────────────────────────────────────────────────────────────────
+    function connectSSE(roomId) {
+      if (sseSource) sseSource.close();
+      const url = `/api/room/${roomId}/events?name=${encodeURIComponent(userName)}`;
+      sseSource = new EventSource(url);
+      sseSource.addEventListener('init', e => {
+        const { transcript, participants } = JSON.parse(e.data);
+        // Load existing transcript from room
+        roomSegments = transcript.map(s => ({ name: s.name, text: s.text, isMine: s.name === userName }));
+        renderRoomTranscript();
+        renderParticipants(participants);
+      });
+      sseSource.addEventListener('segment', e => {
+        const seg = JSON.parse(e.data);
+        if (seg.name === userName) return; // already added locally
+        roomSegments.push({ name: seg.name, text: seg.text, isMine: false });
+        fullTranscript += seg.text + ' ';
+        renderRoomTranscript();
+        updateWordBadge();
+      });
+      sseSource.addEventListener('join', e => {
+        const { participants } = JSON.parse(e.data);
+        renderParticipants(participants);
+      });
+      sseSource.addEventListener('leave', e => {
+        const { participants } = JSON.parse(e.data);
+        renderParticipants(participants);
+      });
+      sseSource.onerror = () => {
+        showReconnectBanner();
+        setTimeout(() => {
+          if (currentRoomId) connectSSE(currentRoomId);
+          hideReconnectBanner();
+        }, 3000);
+      };
+    }
+
+    // ── Participants bar ───────────────────────────────────────────────────────
+    function renderParticipants(names) {
+      roomParticipants.innerHTML = names.map(n => {
+        const initials = n.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+        const isMe = n === userName;
+        return `<div class="participant-chip${isMe?' me':''}">
+          <span class="p-dot"></span>${esc(n)}${isMe?' (dig)':''}
+        </div>`;
+      }).join('');
+    }
+
+    // ── Attributed transcript rendering ───────────────────────────────────────
+    function renderRoomTranscript(interimText) {
+      const ph = document.getElementById('placeholder'); if (ph) ph.remove();
+      if (!roomSegments.length && !interimText) {
+        transcriptEl.innerHTML = '<p class="placeholder" id="placeholder">Din tale vises her, mens du taler...</p>';
+        return;
+      }
+      transcriptEl.innerHTML = roomSegments.map(seg => {
+        const initials = seg.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+        return `<div class="seg-block">
+          <div class="seg-avatar${seg.isMine?' mine':''}">${esc(initials)}</div>
+          <div class="seg-content">
+            <span class="seg-name${seg.isMine?' mine':''}">${esc(seg.name)}</span>
+            <span class="seg-text">${esc(seg.text)}</span>
+          </div>
+        </div>`;
+      }).join('') + (interimText ? `<div class="seg-block">
+        <div class="seg-avatar mine">${esc((userName||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase())}</div>
+        <div class="seg-content">
+          <span class="seg-name mine">${esc(userName||'')}</span>
+          <span class="seg-text"><em style="color:var(--dim)">${esc(interimText)}</em></span>
+        </div>
+      </div>` : '');
+      transcriptEl.scrollTop = transcriptEl.scrollHeight;
+    }
+
+    // ── Post segment to room ───────────────────────────────────────────────────
+    async function postSegment(text) {
+      if (!currentRoomId || !userName) return;
+      try {
+        await fetch(`/api/room/${currentRoomId}/segment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: userName, text }),
+        });
+      } catch (_) {} // Fire and forget
+    }
+
+    // ── Share room link ────────────────────────────────────────────────────────
+    function shareRoomLink() {
+      const url = `${location.origin}/?room=${currentRoomId}`;
+      navigator.clipboard.writeText(url).then(() => showShareToast()).catch(() => {
+        prompt('Del dette link med mødedeltagere:', url);
+      });
+    }
+
+    // ── App init ───────────────────────────────────────────────────────────────
+    (function appInit() {
+      const saved = localStorage.getItem('gf_user_name');
+      const params = new URLSearchParams(location.search);
+      const roomParam = params.get('room');
+      if (saved) {
+        // Pre-fill and show join info if it's a room invite link
+        userName = saved;
+        loginNameInput.value = saved;
+        if (roomParam) {
+          loginSub.textContent = 'Bekræft dit navn for at deltage i mødet';
+          loginJoinInfo.innerHTML = `<strong>🔗 Du er inviteret</strong> til møderum <strong>${roomParam}</strong>`;
+          loginJoinInfo.classList.add('visible');
+        }
+      }
+      // Show login (always — even if name is saved, confirm identity)
+      loginOverlay.classList.remove('hidden');
+    })();
+
+    // ── URL param: load meeting on page open ─────────────────────────────────
+    // (handled inside initRoom after login)
+
+    // ── New DOM refs ──────────────────────────────────────────────────────────
+    const vizTypeSelect       = document.getElementById('vizTypeSelect');
+    const titleInput          = document.getElementById('titleInput');
+    const editModeBar         = document.getElementById('editModeBar');
+    const transcriptEditArea  = document.getElementById('transcriptEditArea');
+    const reconnectBanner     = document.getElementById('reconnectBanner');
+    const btnEditTranscript   = document.getElementById('btnEditTranscript');
+    const vizPanelSub         = document.getElementById('vizPanelSub');
+
+    // ── Fullscreen ────────────────────────────────────────────────────────────
+    function toggleFullscreen() {
+      const el = vizContainer;
+      if (document.fullscreenElement === el) {
+        document.exitFullscreen();
+      } else if (el.requestFullscreen) {
+        el.requestFullscreen().catch(() => {
+          // Fallback: CSS-only
+          document.body.classList.toggle('viz-fullscreen');
+        });
+      } else if (el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
+      } else {
+        document.body.classList.toggle('viz-fullscreen');
+      }
+    }
+    function exitFullscreen() {
+      if (document.fullscreenElement) document.exitFullscreen();
+      document.body.classList.remove('viz-fullscreen');
+    }
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) document.body.classList.remove('viz-fullscreen');
+    });
+
+    // ── Export visualization ──────────────────────────────────────────────────
+    function exportVisualization() {
+      const output = vizContainer.querySelector('.viz-output');
+      if (!output) { showShareToast(); return; }
+      const meetTitle = titleInput.value.trim() || 'møde-visualisering';
+      const fullHtml = `<!DOCTYPE html>
+<html lang="da">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(meetTitle)} · Grundfos AI</title>
+<style>body{margin:0;background:#f4f7fd;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}</style>
+</head>
+<body>${output.innerHTML}</body>
+</html>`;
+      const blob = new Blob([fullHtml], { type: 'text/html' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = (meetTitle.replace(/[^a-z0-9æøå]/gi, '_') || 'viz') + '.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }
+
+    // ── Transcript edit mode ──────────────────────────────────────────────────
+    function toggleTranscriptEdit() {
+      if (editModeBar.classList.contains('visible')) {
+        cancelTranscriptEdit();
+      } else {
+        // Enter edit mode — build flat text from segments or fullTranscript
+        const editText = roomSegments.length
+          ? roomSegments.map(s => `[${s.name}]: ${s.text}`).join('\n')
+          : fullTranscript;
+        transcriptEditArea.value = editText;
+        editModeBar.classList.add('visible');
+        transcriptEditArea.classList.add('visible');
+        transcriptEl.style.display = 'none';
+        btnEditTranscript.textContent = '✎ Redigerer…';
+        btnEditTranscript.style.color = 'var(--blue)';
+        transcriptEditArea.focus();
+      }
+    }
+    function applyTranscriptEdit() {
+      const raw = transcriptEditArea.value.trim();
+      // Parse [Name]: text format back into segments, or treat as plain text
+      const lines = raw.split('\n').filter(l => l.trim());
+      const parsed = lines.map(l => {
+        const m = l.match(/^\[(.+?)\]:\s*(.+)/);
+        if (m) return { name: m[1].trim(), text: m[2].trim(), isMine: m[1].trim() === userName };
+        return { name: userName || 'Redigeret', text: l.trim(), isMine: true };
+      }).filter(s => s.text);
+      roomSegments = parsed;
+      fullTranscript = parsed.map(s => s.text).join(' ') + ' ';
+      cancelTranscriptEdit();
+      updateWordBadge();
+      btnVisualize.disabled = !fullTranscript.trim();
+    }
+    function cancelTranscriptEdit() {
+      editModeBar.classList.remove('visible');
+      transcriptEditArea.classList.remove('visible');
+      transcriptEl.style.display = '';
+      btnEditTranscript.textContent = '✎ Rediger';
+      btnEditTranscript.style.color = '';
+      renderRoomTranscript();
+    }
+
+    // ── Reconnect banner ──────────────────────────────────────────────────────
+    function showReconnectBanner() { reconnectBanner.classList.add('visible'); }
+    function hideReconnectBanner() { reconnectBanner.classList.remove('visible'); }
+
+  </script>
+</body>
+</html>
