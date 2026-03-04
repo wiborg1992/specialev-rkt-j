@@ -476,6 +476,49 @@
     }
     .btn-room-share:hover { background: var(--blue-soft); }
     .room-sep { width: 1px; height: 16px; background: var(--border); }
+    .btn-call {
+      display: flex; align-items: center; gap: 5px;
+      background: var(--green); color: #fff; border: none; cursor: pointer;
+      font-size: .67rem; font-weight: 700; font-family: var(--font);
+      padding: 3px 10px; border-radius: 20px; margin-left: auto;
+      transition: background var(--tr), transform .1s;
+    }
+    .btn-call:hover  { background: #15803d; }
+    .btn-call.active { background: var(--red); }
+    .btn-call.active:hover { background: #b91c1c; }
+
+    /* ── Floating call window ── */
+    .call-window {
+      position: fixed; bottom: 24px; right: 24px; z-index: 1200;
+      width: 420px; height: 320px;
+      background: #111827; border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.45), 0 4px 16px rgba(0,0,0,.3);
+      display: flex; flex-direction: column; overflow: hidden;
+      transition: opacity .25s, transform .25s;
+      resize: both;
+    }
+    .call-window.hidden { display: none; }
+    .call-win-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; background: rgba(255,255,255,.05);
+      border-bottom: 1px solid rgba(255,255,255,.1);
+      cursor: move; user-select: none; flex-shrink: 0;
+    }
+    .call-win-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%;
+      animation: callPulse 1.5s ease-in-out infinite; }
+    @keyframes callPulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .call-win-title { color: #e2e8f0; font-size: .72rem; font-weight: 600; flex: 1; }
+    .call-win-actions { display: flex; gap: 4px; }
+    .call-win-btn {
+      background: rgba(255,255,255,.1); border: none; color: #94a3b8;
+      width: 22px; height: 22px; border-radius: 6px; cursor: pointer;
+      font-size: .7rem; display: flex; align-items: center; justify-content: center;
+      transition: background .15s, color .15s;
+    }
+    .call-win-btn:hover { background: rgba(255,255,255,.2); color: #fff; }
+    .call-win-btn.close:hover { background: var(--red); color: #fff; }
+    .call-win-iframe { flex: 1; border: none; width: 100%; display: block; }
+
     .room-participants { display: flex; align-items: center; gap: 5px; flex: 1; flex-wrap: wrap; }
     .participant-chip {
       display: flex; align-items: center; gap: 4px;
@@ -763,6 +806,9 @@
     </button>
     <div class="room-sep"></div>
     <div class="room-participants" id="roomParticipants"></div>
+    <button class="btn-call" id="btnCall" onclick="toggleCall()" title="Start/stop opkald">
+      📞 Start opkald
+    </button>
   </div>
 
   <!-- MAIN -->
@@ -925,6 +971,21 @@
   <div class="share-toast" id="shareToast">✓ Link kopieret til udklipsholder</div>
 
   <!-- RECONNECT BANNER -->
+  <!-- FLOATING CALL WINDOW -->
+  <div class="call-window hidden" id="callWindow">
+    <div class="call-win-header" id="callWinHeader">
+      <div class="call-win-dot"></div>
+      <span class="call-win-title" id="callWinTitle">Møde opkald</span>
+      <div class="call-win-actions">
+        <button class="call-win-btn" onclick="minimizeCall()" title="Minimer">—</button>
+        <button class="call-win-btn close" onclick="toggleCall()" title="Afslut opkald">✕</button>
+      </div>
+    </div>
+    <iframe class="call-win-iframe" id="jitsiFrame"
+      allow="camera; microphone; fullscreen; display-capture"
+      src="about:blank"></iframe>
+  </div>
+
   <div class="reconnect-banner" id="reconnectBanner">🔄 Forbinder til møderum igen...</div>
 
   <!-- FULLSCREEN EXIT BUTTON -->
@@ -1680,6 +1741,75 @@
     }
 
     // ── Reconnect banner ──────────────────────────────────────────────────────
+    // ── Voice call (Jitsi Meet) ──────────────────────────────────────────────
+    let callOpen     = false;
+    let callMinimized = false;
+
+    function toggleCall() {
+      const win   = document.getElementById('callWindow');
+      const btn   = document.getElementById('btnCall');
+      const frame = document.getElementById('jitsiFrame');
+      const title = document.getElementById('callWinTitle');
+
+      callOpen = !callOpen;
+      if (callOpen) {
+        // Build Jitsi URL: room = grundfos-{roomId}, display name pre-filled
+        const room     = 'grundfos-' + (currentRoomId || 'default');
+        const name     = encodeURIComponent(userName || 'Deltager');
+        const jitsiUrl = `https://meet.jit.si/${room}` +
+          `#userInfo.displayName="${name}"` +
+          `&config.prejoinPageEnabled=false` +
+          `&config.startWithVideoMuted=true` +
+          `&config.toolbarButtons=["microphone","camera","hangup","tileview"]`;
+        frame.src = jitsiUrl;
+        title.textContent = 'Opkald · ' + (currentRoomId || '');
+        win.classList.remove('hidden');
+        win.style.height = '320px';
+        callMinimized = false;
+        btn.classList.add('active');
+        btn.textContent = '📵 Afslut opkald';
+        makeDraggable(win, document.getElementById('callWinHeader'));
+      } else {
+        frame.src = 'about:blank';
+        win.classList.add('hidden');
+        btn.classList.remove('active');
+        btn.innerHTML = '📞 Start opkald';
+        callMinimized = false;
+      }
+    }
+
+    function minimizeCall() {
+      const win = document.getElementById('callWindow');
+      callMinimized = !callMinimized;
+      if (callMinimized) {
+        win.style.height = '36px';
+        win.style.overflow = 'hidden';
+      } else {
+        win.style.height = '320px';
+        win.style.overflow = '';
+      }
+    }
+
+    function makeDraggable(el, handle) {
+      let ox = 0, oy = 0, mx = 0, my = 0;
+      handle.onmousedown = dragStart;
+      function dragStart(e) {
+        e.preventDefault();
+        ox = e.clientX; oy = e.clientY;
+        document.onmousemove = dragMove;
+        document.onmouseup   = dragEnd;
+      }
+      function dragMove(e) {
+        mx = ox - e.clientX; my = oy - e.clientY;
+        ox = e.clientX;      oy = e.clientY;
+        el.style.top    = (el.offsetTop  - my) + 'px';
+        el.style.left   = (el.offsetLeft - mx) + 'px';
+        el.style.right  = 'auto';
+        el.style.bottom = 'auto';
+      }
+      function dragEnd() { document.onmousemove = null; document.onmouseup = null; }
+    }
+
     function showReconnectBanner() { reconnectBanner.classList.add('visible'); }
     function hideReconnectBanner() { reconnectBanner.classList.remove('visible'); }
 
