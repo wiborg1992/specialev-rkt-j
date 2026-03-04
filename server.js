@@ -21,8 +21,9 @@ function loadEnv(filePath) {
 }
 loadEnv(path.join(__dirname, '.env'));
 
-const PORT             = process.env.PORT || 3000;
+const PORT              = process.env.PORT || 3000;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const ASSEMBLYAI_API_KEY = process.env.ASSEMBLYAI_API_KEY || '';
 
 // ─── MIME types ───────────────────────────────────────────────────────────────
 const MIME = {
@@ -507,7 +508,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => { body += chunk; });
     req.on('end', async () => {
       try {
-        const { transcript: rawTranscript, roomId, title, vizType } = JSON.parse(body);
+        const { transcript: rawTranscript, roomId, title, vizType, isIncremental, previousViz } = JSON.parse(body);
         // If roomId provided, use attributed room transcript
         let transcript = rawTranscript;
         if (roomId && rooms.has(roomId)) {
@@ -544,7 +545,7 @@ const server = http.createServer(async (req, res) => {
             system:     SYSTEM_PROMPT,
             messages: [{
               role:    'user',
-              content: `${title ? `Mødetitel: ${title}\n\n` : ''}Her er mødetransskriptionen:\n\n${transcript}\n\n${vizType && vizType !== 'auto' ? `VIGTIG INSTRUKS: Generer SPECIFIKT denne visualiseringstype — ikke noget andet: ${vizType}\n\n` : ''}Generer en passende HTML-visualisering.`,
+              content: `${title ? `Mødetitel: ${title}\n\n` : ''}Her er mødetransskriptionen:\n\n${transcript}\n\n${vizType && vizType !== 'auto' ? `VIGTIG INSTRUKS: Generer SPECIFIKT denne visualiseringstype — ikke noget andet: ${vizType}\n\n` : ''}${isIncremental && previousViz ? `INKREMENTEL OPDATERING: Du har allerede genereret en visualisering til dette møde (vedlagt nedenfor). Mødet er fortsat — opdater og udvid visualiseringen med de nyeste informationer fra transskriptionen. Bevar den overordnede struktur og tilføj/juster indhold.\n\nNUVÆRENDE VISUALISERING (HTML):\n${previousViz.slice(0, 3000)}...\n\n` : ''}Generer en passende HTML-visualisering.`,
             }],
           }),
         });
@@ -686,6 +687,28 @@ const server = http.createServer(async (req, res) => {
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ id: room.id, transcript: room.transcript, participants: [...room.clients.keys()] }));
+  }
+
+  // GET /api/assemblyai-token — issue temporary AssemblyAI token for client
+  if (req.method === 'GET' && req.url === '/api/assemblyai-token') {
+    if (!ASSEMBLYAI_API_KEY) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'ASSEMBLYAI_API_KEY ikke sat på serveren.' }));
+    }
+    try {
+      const tokenRes = await fetch('https://api.assemblyai.com/v2/realtime/token', {
+        method:  'POST',
+        headers: { Authorization: ASSEMBLYAI_API_KEY, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ expires_in: 480 }),
+      });
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok) throw new Error(tokenData.error || 'Token-fejl');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ token: tokenData.token }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: err.message }));
+    }
   }
 
   // GET /api/history

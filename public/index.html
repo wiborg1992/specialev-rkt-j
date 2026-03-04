@@ -301,6 +301,27 @@
     .paste-textarea::placeholder { color: var(--dim); font-style: italic; }
     .paste-char-count { font-size: .65rem; color: var(--dim); text-align: right; }
 
+    /* ─── ASR toggle ─── */
+    .asr-toggle-bar {
+      padding: 6px 14px; border-top: 1px solid var(--border-2);
+      display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+      background: var(--white);
+    }
+    .asr-toggle-label { font-size: .68rem; color: var(--muted); margin-right: 2px; }
+    .asr-toggle-btn {
+      padding: 3px 10px; border-radius: 20px; border: 1.5px solid var(--border);
+      font-size: .7rem; cursor: pointer; background: var(--bg);
+      color: var(--slate); transition: all .15s; font-family: var(--font);
+    }
+    .asr-toggle-btn:hover { border-color: var(--blue); color: var(--blue); }
+    .asr-toggle-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+    .asr-status-badge {
+      margin-left: auto; font-size: .65rem; padding: 2px 8px;
+      border-radius: 10px; background: #fef3c7; color: #92400e;
+      display: none;
+    }
+    .asr-status-badge.visible { display: inline-block; }
+
     /* ─── Buttons ─── */
     .btn-group {
       padding: 10px 14px; display: flex; gap: 6px;
@@ -884,8 +905,15 @@
         <textarea class="transcript-edit-area" id="transcriptEditArea"></textarea>
 
         <div class="timer-bar" id="timerBar" style="display:none;">
-          <span>⏱ Auto om <strong id="countdown">30</strong>s</span>
-          <div class="timer-progress"><div class="timer-fill" id="timerFill"></div></div>
+          <span>↺ Auto-viz: <strong id="newWordCount">0</strong>/<strong>40</strong> nye ord</span>
+          <div class="timer-progress"><div class="timer-fill" id="timerFill" style="transition:width .5s;"></div></div>
+        </div>
+
+        <div class="asr-toggle-bar">
+          <span class="asr-toggle-label">Mikrofon:</span>
+          <button class="asr-toggle-btn active" id="asrBtnBrowser" onclick="setAsrMode('browser')">🌐 Browser</button>
+          <button class="asr-toggle-btn" id="asrBtnAssembly" onclick="setAsrMode('assemblyai')">🇩🇰 AssemblyAI</button>
+          <span class="asr-status-badge" id="asrStatusBadge"></span>
         </div>
 
         <div class="btn-group">
@@ -924,6 +952,7 @@
         <div class="ph-text">
           <h2>AI Visualisering</h2>
           <div class="sub" id="vizPanelSub">Genereret af Claude · Grundfos</div>
+          <div class="sub" id="vizLastUpdated" style="margin-left:8px;color:var(--blue);display:none;"></div>
         </div>
         <span class="meeting-id-badge" id="meetingIdBadge"></span>
         <div class="ph-actions">
@@ -992,11 +1021,18 @@
   <button class="btn-fs-exit" id="btnFsExit" onclick="exitFullscreen()">✕ Afslut fuldskærm</button>
 
   <script>
-    const AUTO_INTERVAL = 30;
+    const WORDS_TO_TRIGGER = 40;   // new words before auto-viz
+    const SPEECH_PAUSE_MS  = 6000; // wait 6s after last speech
     let recognition = null, isRecording = false;
     let fullTranscript = '', interimText = '';
-    let countdown = AUTO_INTERVAL, countdownInterval = null;
     let activeTab = 'mic';
+    // Incremental viz state
+    let wordsAtLastViz  = 0;
+    let lastSpeechTime  = 0;
+    let autoVizTimer    = null;
+    let currentVizHtml  = '';
+    let vizUpdatedAt    = null;
+    let vizClockInterval = null;
     let recentConfidences = [], lowConfCount = 0;
     const CONF_THRESHOLD = 0.38, LOW_CONF_WARN = 4;
     let isInTeams = false, teamsFrame = 'content';
@@ -1089,14 +1125,13 @@
 
     // Browser check
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      btnStart.disabled = true;
-      transcriptEl.innerHTML = `<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:18px;color:#92400e;text-align:center;font-size:.82rem">
-        <div style="font-size:1.8rem;margin-bottom:8px">⚠️</div>
-        <strong style="display:block;margin-bottom:5px">Mikrofon ikke tilgængelig</strong>
-        Åbn i <strong>Chrome</strong> eller <strong>Edge</strong> for live-transskription,<br>
-        eller brug <strong>"Indsæt tekst"</strong> med Teams-transskription.
-      </div>`;
-    } else { setupRecognition(); }
+      // No browser SR — switch to AssemblyAI automatically if server key might be available
+      document.getElementById('asrBtnBrowser').disabled = true;
+      document.getElementById('asrBtnBrowser').title = 'Kræver Chrome/Edge';
+      setAsrMode('assemblyai');
+    } else {
+      setupRecognition();
+    }
 
     function setupRecognition() {
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1123,12 +1158,145 @@
             fullTranscript += normalized + ' ';
             updateQuality(c, false); updateWordBadge();
             postSegment(normalized); // broadcast to room
+            scheduleAutoViz();       // check if auto-viz should trigger
           } else { interim += t; }
         }
         interimText = interim; renderRoomTranscript(interim);
       };
       recognition.onerror = e => { if (e.error !== 'no-speech') setStatus('Fejl: ' + e.error); };
       recognition.onend = () => { if (isRecording) recognition.start(); };
+    }
+
+    // ── AssemblyAI real-time streaming ──────────────────────────────────────────
+    let asrMode = 'browser';            // 'browser' | 'assemblyai'
+    let aaiSocket = null;               // AssemblyAI WebSocket
+    let aaiAudioCtx = null;             // AudioContext for PCM capture
+    let aaiMicStream = null;            // MediaStream
+    let aaiProcessor = null;            // ScriptProcessorNode
+
+    function setAsrMode(mode) {
+      if (isRecording) stopRecording();
+      asrMode = mode;
+      document.getElementById('asrBtnBrowser').classList.toggle('active', mode === 'browser');
+      document.getElementById('asrBtnAssembly').classList.toggle('active', mode === 'assemblyai');
+      const badge = document.getElementById('asrStatusBadge');
+      if (mode === 'assemblyai') {
+        badge.textContent = '🇩🇰 Bedre dansk + speaker labels';
+        badge.classList.add('visible');
+      } else {
+        badge.classList.remove('visible');
+      }
+    }
+
+    // ── AssemblyAI WebSocket session ─────────────────────────────────────────
+    async function startAssemblyAI() {
+      const badge = document.getElementById('asrStatusBadge');
+      badge.textContent = 'Henter token...'; badge.classList.add('visible');
+
+      // 1) Get temp token from our server
+      let token;
+      try {
+        const r = await fetch('/api/assemblyai-token');
+        const d = await r.json();
+        if (!r.ok || !d.token) throw new Error(d.error || 'Ingen token');
+        token = d.token;
+      } catch (err) {
+        badge.textContent = '❌ ' + err.message;
+        setStatus('AssemblyAI fejl: ' + err.message);
+        isRecording = false;
+        btnStart.disabled = false; btnStop.disabled = true;
+        return;
+      }
+
+      // 2) Get microphone stream
+      try {
+        aaiMicStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      } catch (err) {
+        badge.textContent = '❌ Mikrofon afvist';
+        setStatus('Mikrofon adgang nægtet'); isRecording = false;
+        btnStart.disabled = false; btnStop.disabled = true;
+        return;
+      }
+
+      // 3) Set up PCM capture via ScriptProcessor
+      aaiAudioCtx = new AudioContext({ sampleRate: 16000 });
+      const source = aaiAudioCtx.createMediaStreamSource(aaiMicStream);
+      aaiProcessor = aaiAudioCtx.createScriptProcessor(4096, 1, 1);
+
+      // 4) Connect to AssemblyAI WebSocket
+      const wsUrl = `wss://api.assemblyai.com/v2/realtime/ws?sample_rate=16000&language_code=da&token=${token}`;
+      aaiSocket = new WebSocket(wsUrl);
+
+      aaiSocket.onopen = () => {
+        badge.textContent = '🔴 AssemblyAI aktiv'; badge.style.background = '#dcfce7'; badge.style.color = '#166534';
+        setStatus('Optager... (AssemblyAI)');
+        // Start sending PCM
+        aaiProcessor.onaudioprocess = (e) => {
+          if (!aaiSocket || aaiSocket.readyState !== WebSocket.OPEN) return;
+          const float32 = e.inputBuffer.getChannelData(0);
+          // Convert float32 → int16
+          const int16 = new Int16Array(float32.length);
+          for (let i = 0; i < float32.length; i++) {
+            int16[i] = Math.max(-32768, Math.min(32767, float32[i] * 32768));
+          }
+          // Base64 encode and send
+          const bytes = new Uint8Array(int16.buffer);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+          const b64 = btoa(binary);
+          aaiSocket.send(JSON.stringify({ audio_data: b64 }));
+        };
+        source.connect(aaiProcessor);
+        aaiProcessor.connect(aaiAudioCtx.destination);
+      };
+
+      aaiSocket.onmessage = (evt) => {
+        let msg;
+        try { msg = JSON.parse(evt.data); } catch { return; }
+        if (!msg.text) return;
+
+        const isFinal = msg.message_type === 'FinalTranscript';
+        const speaker = msg.words?.[0]?.speaker ? ' [Taler ' + msg.words[0].speaker + ']' : '';
+
+        if (isFinal) {
+          const text = msg.text.trim();
+          if (!text) return;
+          const normalized = normalizeRegulatoryTerms(text);
+          roomSegments.push({ name: userName || 'Mig', text: normalized, isMine: true });
+          fullTranscript += normalized + ' ';
+          updateWordBadge(); interimText = '';
+          postSegment(normalized);
+          scheduleAutoViz();
+          renderRoomTranscript('');
+        } else {
+          // Partial transcript
+          interimText = msg.text;
+          renderRoomTranscript(msg.text);
+        }
+      };
+
+      aaiSocket.onerror = (err) => {
+        badge.textContent = '❌ WebSocket fejl'; badge.style.background = '#fef2f2'; badge.style.color = '#991b1b';
+        setStatus('AssemblyAI fejl');
+      };
+
+      aaiSocket.onclose = () => {
+        if (isRecording) {
+          badge.textContent = '⚠ Forbindelse lukket';
+          setStatus('AssemblyAI forbundet igen...');
+          setTimeout(() => { if (isRecording) startAssemblyAI(); }, 1500);
+        }
+      };
+    }
+
+    function stopAssemblyAI() {
+      if (aaiProcessor) { try { aaiProcessor.disconnect(); } catch (_) {} aaiProcessor = null; }
+      if (aaiAudioCtx)  { try { aaiAudioCtx.close(); } catch (_) {} aaiAudioCtx = null; }
+      if (aaiMicStream) { aaiMicStream.getTracks().forEach(t => t.stop()); aaiMicStream = null; }
+      if (aaiSocket)    { try { aaiSocket.close(); } catch (_) {} aaiSocket = null; }
+      const badge = document.getElementById('asrStatusBadge');
+      badge.textContent = '🇩🇰 Bedre dansk + speaker labels';
+      badge.style.background = ''; badge.style.color = '';
     }
 
     // ── Regulatoriske akronym-korrektioner ────────────────────────────────────
@@ -1195,16 +1363,21 @@
 
     // Recording
     function startRecording() {
-      if (!recognition) return;
-      isRecording = true; recognition.start();
+      isRecording = true;
       btnStart.disabled = true; btnStop.disabled = false; btnVisualize.disabled = false;
-      setStatus('Optager...');
       document.body.classList.add('recording');
       recChip.classList.add('active'); recChipLabel.textContent = 'OPTAGER';
       startTimer();
+      if (asrMode === 'assemblyai') {
+        startAssemblyAI();
+      } else {
+        if (!recognition) { isRecording = false; return; }
+        setStatus('Optager...');
+        recognition.start();
+      }
     }
     function stopRecording() {
-      isRecording = false; recognition.stop();
+      isRecording = false;
       btnStart.disabled = false; btnStop.disabled = true;
       setStatus('Stoppet');
       document.body.classList.remove('recording');
@@ -1212,18 +1385,63 @@
       stopTimer();
       recentConfidences = []; lowConfCount = 0;
       qualityBar.classList.remove('visible'); noiseWarning.classList.remove('visible');
+      if (asrMode === 'assemblyai') {
+        stopAssemblyAI();
+      } else {
+        if (recognition) recognition.stop();
+      }
     }
     function setStatus(text) { statusText.textContent = text; }
     function startTimer() {
       timerBar.style.display = 'flex';
-      countdown = AUTO_INTERVAL; countdownEl.textContent = countdown; timerFill.style.width = '0%';
-      countdownInterval = setInterval(() => {
-        countdown--; countdownEl.textContent = countdown;
-        timerFill.style.width = (((AUTO_INTERVAL-countdown)/AUTO_INTERVAL)*100) + '%';
-        if (countdown <= 0) { triggerVisualize(); countdown = AUTO_INTERVAL; timerFill.style.width = '0%'; }
+      timerFill.style.width = '0%';
+      wordsAtLastViz = 0;
+      // Start "last updated" clock
+      clearInterval(vizClockInterval);
+      vizClockInterval = setInterval(() => {
+        const newWordEl  = document.getElementById('newWordCount');
+        const fillEl     = document.getElementById('timerFill');
+        const updatedEl  = document.getElementById('vizLastUpdated');
+        const t = (fullTranscript + ' ' + interimText).trim();
+        const total = t ? t.split(/\s+/).length : 0;
+        const newW  = Math.max(0, total - wordsAtLastViz);
+        if (newWordEl) newWordEl.textContent = newW;
+        if (fillEl)    fillEl.style.width = Math.min(100, (newW / WORDS_TO_TRIGGER) * 100) + '%';
+        if (updatedEl && vizUpdatedAt) {
+          const s = Math.round((Date.now() - vizUpdatedAt) / 1000);
+          updatedEl.textContent = s < 60 ? '↺ ' + s + 's siden' : '↺ ' + Math.round(s/60) + 'm siden';
+          updatedEl.style.display = '';
+        }
       }, 1000);
     }
-    function stopTimer() { clearInterval(countdownInterval); timerBar.style.display = 'none'; }
+    function stopTimer() {
+      clearInterval(vizClockInterval);
+      timerBar.style.display = 'none';
+    }
+    // Called after every final speech segment to check if auto-viz should trigger
+    function scheduleAutoViz() {
+      lastSpeechTime = Date.now();
+      clearTimeout(autoVizTimer);
+      const t = (fullTranscript + ' ' + interimText).trim();
+      const wordCount = t ? t.split(/\s+/).length : 0;
+      const newWords  = wordCount - wordsAtLastViz;
+      if (newWords < WORDS_TO_TRIGGER) return;
+      // Enough new words — wait for speech pause then fire
+      autoVizTimer = setTimeout(() => {
+        if (!isGenerating && isRecording) triggerVisualize(true);
+      }, SPEECH_PAUSE_MS);
+    }
+    // Crossfade old viz → new viz
+    function fadeToNewViz(html, id, title) {
+      const existing = vizContainer.querySelector('.viz-output');
+      if (existing) {
+        existing.style.transition = 'opacity .4s ease';
+        existing.style.opacity = '0';
+        setTimeout(() => { showVisualization(html, id, title); }, 420);
+      } else {
+        showVisualization(html, id, title);
+      }
+    }
 
     // Visualize — streaming SSE version
     // ── Live streaming render state ───────────────────────────────────────────
@@ -1256,35 +1474,44 @@
       } catch (_) {}
     }
 
-    async function triggerVisualize() {
+    async function triggerVisualize(isAuto = false) {
       let text = '';
       if (activeTab === 'mic') {
         text = (fullTranscript + ' ' + interimText).trim();
-        if (!text) { showError('Ingen tekst endnu — start optagelse og tal!'); return; }
-        if (isRecording) { countdown = AUTO_INTERVAL; countdownEl.textContent = countdown; timerFill.style.width = '0%'; }
+        if (!text) { if (!isAuto) showError('Ingen tekst endnu — start optagelse og tal!'); return; }
       } else {
         text = pasteInput.value.trim();
-        if (!text) { showError('Indsæt tekst fra Teams eller et referat før du visualiserer.'); return; }
+        if (!text) { if (!isAuto) showError('Indsæt tekst fra Teams eller et referat før du visualiserer.'); return; }
       }
+      const wordCount = text ? text.split(/\s+/).length : 0;
       isGenerating = true;
       liveIframe   = null;
-      showStreamLoading();
+
+      if (isAuto && currentVizHtml) {
+        showBgUpdatingBadge();   // keep current viz visible
+      } else {
+        showStreamLoading();     // full loading state for manual trigger
+      }
+
       let accHtml = '', charCount = 0, liveStarted = false;
       try {
         const response = await fetch('/api/visualize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            transcript: text,
-            roomId:     currentRoomId,
-            title:      document.getElementById('titleInput').value.trim() || null,
-            vizType:    document.getElementById('vizTypeSelect').value,
+            transcript:    text,
+            roomId:        currentRoomId,
+            title:         document.getElementById('titleInput').value.trim() || null,
+            vizType:       document.getElementById('vizTypeSelect').value,
+            isIncremental: isAuto,
+            previousViz:  isAuto ? currentVizHtml : null,
           }),
         });
         if (!response.ok || !response.body) {
           const err = await response.json().catch(() => ({}));
           isGenerating = false;
-          showError(err.error || 'Ukendt serverfejl.'); return;
+          hideBgUpdatingBadge();
+          if (!isAuto) showError(err.error || 'Ukendt serverfejl.'); return;
         }
         const reader  = response.body.getReader();
         const decoder = new TextDecoder();
@@ -1299,30 +1526,66 @@
             if (!line.startsWith('data: ')) continue;
             try {
               const data = JSON.parse(line.slice(6));
-              if (data.error) { isGenerating = false; showError(data.error); return; }
+              if (data.error) {
+                isGenerating = false; hideBgUpdatingBadge();
+                if (!isAuto) showError(data.error); return;
+              }
               if (data.chunk) {
                 accHtml   += data.chunk;
                 charCount += data.chunk.length;
-                updateStreamProgress(charCount);
-                // Switch from spinner to live iframe once CSS is ready
-                if (!liveStarted && (accHtml.includes('</style>') || charCount > 600)) {
-                  liveStarted = true;
-                  startLiveRender();
-                  liveIframe.contentDocument.write(accHtml);
-                } else if (liveStarted) {
-                  writeLiveChunk(data.chunk, charCount);
+                if (!isAuto) updateStreamProgress(charCount);
+                else {
+                  const b = document.getElementById('bgUpdBadge');
+                  if (b) b.textContent = '↺ ' + charCount.toLocaleString('da-DK') + ' tegn...';
+                }
+                // Progressive live render (only for manual triggers, or auto without existing viz)
+                if (!isAuto || !currentVizHtml) {
+                  if (!liveStarted && (accHtml.includes('</style>') || charCount > 600)) {
+                    liveStarted = true;
+                    startLiveRender();
+                    liveIframe.contentDocument.write(accHtml);
+                  } else if (liveStarted) {
+                    writeLiveChunk(data.chunk, charCount);
+                  }
                 }
               }
               if (data.done) {
                 if (liveIframe) { try { liveIframe.contentDocument.close(); } catch(_) {} liveIframe = null; }
-                isGenerating = false;
-                showVisualization(accHtml, data.id, data.title);
+                wordsAtLastViz = wordCount;
+                vizUpdatedAt   = Date.now();
+                currentVizHtml = accHtml;
+                isGenerating   = false;
+                hideBgUpdatingBadge();
+                if (isAuto && vizContainer.querySelector('.viz-output')) {
+                  fadeToNewViz(accHtml, data.id, data.title);
+                } else {
+                  showVisualization(accHtml, data.id, data.title);
+                }
                 refreshHistCount();
               }
             } catch (_) {}
           }
         }
-      } catch (err) { isGenerating = false; showError('Netværksfejl: ' + err.message); }
+      } catch (err) {
+        isGenerating = false; hideBgUpdatingBadge();
+        if (!isAuto) showError('Netværksfejl: ' + err.message);
+      }
+    }
+    function showBgUpdatingBadge() {
+      let b = document.getElementById('bgUpdBadge');
+      if (!b) {
+        b = document.createElement('div');
+        b.id = 'bgUpdBadge';
+        b.style.cssText = 'position:sticky;bottom:10px;float:right;margin-right:8px;' +
+          'background:rgba(0,42,92,.88);color:var(--blue);font-size:.68rem;' +
+          'padding:3px 10px;border-radius:20px;pointer-events:none;z-index:5;';
+        vizContainer.appendChild(b);
+      }
+      b.textContent = '↺ Opdaterer...';
+    }
+    function hideBgUpdatingBadge() {
+      const b = document.getElementById('bgUpdBadge');
+      if (b) b.remove();
     }
     function showStreamLoading() {
       vizContainer.innerHTML = `<div class="loading-state" id="streamState">
