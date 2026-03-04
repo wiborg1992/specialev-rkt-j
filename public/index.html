@@ -1165,6 +1165,36 @@
     function stopTimer() { clearInterval(countdownInterval); timerBar.style.display = 'none'; }
 
     // Visualize — streaming SSE version
+    // ── Live streaming render state ───────────────────────────────────────────
+    let isGenerating = false;
+    let liveIframe   = null;
+
+    function startLiveRender() {
+      vizContainer.innerHTML = '';
+      vizContainer.style.position = 'relative';
+      liveIframe = document.createElement('iframe');
+      liveIframe.style.cssText = 'width:100%;min-height:70vh;border:none;display:block;border-radius:var(--radius-xl);';
+      vizContainer.appendChild(liveIframe);
+      // Small "generating" badge
+      const badge = document.createElement('div');
+      badge.id = 'liveGenBadge';
+      badge.style.cssText = 'position:sticky;bottom:12px;float:right;margin-right:8px;' +
+        'background:rgba(0,42,92,.88);color:var(--blue);font-size:.68rem;padding:3px 10px;' +
+        'border-radius:20px;pointer-events:none;';
+      badge.textContent = '⟳ Genererer...';
+      vizContainer.appendChild(badge);
+      liveIframe.contentDocument.open();
+    }
+
+    function writeLiveChunk(chunk, charCount) {
+      if (!liveIframe) return;
+      try {
+        liveIframe.contentDocument.write(chunk);
+        const badge = document.getElementById('liveGenBadge');
+        if (badge) badge.textContent = '⟳ ' + charCount.toLocaleString('da-DK') + ' tegn...';
+      } catch (_) {}
+    }
+
     async function triggerVisualize() {
       let text = '';
       if (activeTab === 'mic') {
@@ -1175,9 +1205,10 @@
         text = pasteInput.value.trim();
         if (!text) { showError('Indsæt tekst fra Teams eller et referat før du visualiserer.'); return; }
       }
+      isGenerating = true;
+      liveIframe   = null;
       showStreamLoading();
-      let accHtml = '';
-      let charCount = 0;
+      let accHtml = '', charCount = 0, liveStarted = false;
       try {
         const response = await fetch('/api/visualize', {
           method: 'POST',
@@ -1191,6 +1222,7 @@
         });
         if (!response.ok || !response.body) {
           const err = await response.json().catch(() => ({}));
+          isGenerating = false;
           showError(err.error || 'Ukendt serverfejl.'); return;
         }
         const reader  = response.body.getReader();
@@ -1206,13 +1238,30 @@
             if (!line.startsWith('data: ')) continue;
             try {
               const data = JSON.parse(line.slice(6));
-              if (data.error)  { showError(data.error); return; }
-              if (data.chunk)  { accHtml += data.chunk; charCount += data.chunk.length; updateStreamProgress(charCount); }
-              if (data.done)   { showVisualization(accHtml, data.id, data.title); refreshHistCount(); }
+              if (data.error) { isGenerating = false; showError(data.error); return; }
+              if (data.chunk) {
+                accHtml   += data.chunk;
+                charCount += data.chunk.length;
+                updateStreamProgress(charCount);
+                // Switch from spinner to live iframe once CSS is ready
+                if (!liveStarted && (accHtml.includes('</style>') || charCount > 600)) {
+                  liveStarted = true;
+                  startLiveRender();
+                  liveIframe.contentDocument.write(accHtml);
+                } else if (liveStarted) {
+                  writeLiveChunk(data.chunk, charCount);
+                }
+              }
+              if (data.done) {
+                if (liveIframe) { try { liveIframe.contentDocument.close(); } catch(_) {} liveIframe = null; }
+                isGenerating = false;
+                showVisualization(accHtml, data.id, data.title);
+                refreshHistCount();
+              }
             } catch (_) {}
           }
         }
-      } catch (err) { showError('Netværksfejl: ' + err.message); }
+      } catch (err) { isGenerating = false; showError('Netværksfejl: ' + err.message); }
     }
     function showStreamLoading() {
       vizContainer.innerHTML = `<div class="loading-state" id="streamState">
@@ -1347,6 +1396,17 @@
     }
 
     let shareToastTimer;
+    function showVizBroadcastToast(title) {
+      const t = document.createElement('div');
+      t.style.cssText = 'position:fixed;bottom:28px;left:50%;transform:translateX(-50%);' +
+        'background:var(--navy);color:#fff;padding:10px 22px;border-radius:30px;' +
+        'font-size:.82rem;z-index:9999;box-shadow:var(--shadow-lg);' +
+        'animation:fadeUp .3s ease;pointer-events:none;white-space:nowrap;';
+      t.textContent = '❖ Ny visualisering delt i mødet' + (title ? ': ' + title : '');
+      document.body.appendChild(t);
+      setTimeout(() => t.remove(), 4000);
+    }
+
     function showShareToast() {
       shareToastEl.classList.add('visible');
       clearTimeout(shareToastTimer);
@@ -1423,6 +1483,15 @@
       sseSource.addEventListener('leave', e => {
         const { participants } = JSON.parse(e.data);
         renderParticipants(participants);
+      });
+      // ── Shared visualization broadcast ─────────────────────────────────────
+      sseSource.addEventListener('visualization', e => {
+        const { id, title, html } = JSON.parse(e.data);
+        if (!isGenerating) {
+          showVisualization(html, id, title);
+          refreshHistCount();
+          showVizBroadcastToast(title);
+        }
       });
       sseSource.onerror = () => {
         showReconnectBanner();

@@ -588,6 +588,11 @@ const server = http.createServer(async (req, res) => {
         const record = saveMeeting(id, title, transcript, fullHtml.trim());
         res.write(`data: ${JSON.stringify({ done: true, id, title: record.title })}\n\n`);
         res.end();
+
+        // Broadcast completed visualization to ALL other room members (real-time sharing)
+        if (roomId && rooms.has(roomId)) {
+          broadcastToRoom(roomId, 'visualization', { id, title: record.title, html: fullHtml.trim() });
+        }
       } catch (err) {
         console.error('Serverfejl:', err.message);
         try { res.write(`data: ${JSON.stringify({ error: 'Intern serverfejl: ' + err.message })}\n\n`); } catch (_) {}
