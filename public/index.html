@@ -2031,12 +2031,18 @@
         btn.classList.add('active');
         btn.textContent = '📵 Afslut opkald';
         makeDraggable(win, document.getElementById('callWinHeader'));
+        // Auto-start transcription when call opens (small delay so Jitsi gets mic first)
+        if (!isRecording) {
+          setTimeout(() => { if (!isRecording) startRecording(); }, 1200);
+        }
       } else {
         frame.src = 'about:blank';
         win.classList.add('hidden');
         btn.classList.remove('active');
         btn.innerHTML = '📞 Start opkald';
         callMinimized = false;
+        // Auto-stop transcription when call ends
+        if (isRecording) stopRecording();
       }
     }
 
