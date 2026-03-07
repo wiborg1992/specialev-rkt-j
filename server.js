@@ -197,58 +197,207 @@ Du skal generere et interface der ER uadskilleligt fra Grundfos iSolutions Suite
   Monospace font:       'Courier New', 'Consolas', monospace  (alle numeriske værdier)
   UI font:              system-ui, -apple-system, 'Segoe UI', sans-serif
 
-━━━ OBLIGATORISK LAYOUT (fullscreen 16:9 feel) ━━━
+━━━ PRIMÆR LAYOUT — GRUNDFOS iSOLUTIONS SUITE (GiS) ━━━
 
-STRUKTUR:
-  ┌──────────────────────────────────────────────────┐
-  │  TITLEBAR (42px, #080e1a)                         │
-  ├──────────────────────────────────────────────────┤
-  │  MAIN CONTENT AREA (flex: 1)                      │
-  │  (tiles, gauges, skematik, data)                  │
-  ├──────────────────────────────────────────────────┤
-  │  BOTTOM NAV BAR (44px, #080e1a)                   │
-  └──────────────────────────────────────────────────┘
+Dette er din PRIMÆRE layoutreference. Generer altid i denne struktur for HMI/dashboard-visualiseringer.
+Kilden er Grundfos iSOLUTIONS Suite — iF Design Award 2025.
 
-─── TITLEBAR ───────────────────────────────────────────
-height: 42px; padding: 0 20px; display:flex; align-items:center; justify-content:space-between;
-background: #080e1a; border-bottom: 1px solid rgba(0,200,255,0.2);
+OVERORDNET STRUKTUR (hele viewporten):
+  ┌──────┬──────────────────────────────────────────────────┐
+  │      │  TOPBAR (48px) — logo, system-id, søg, profil    │
+  │ SIDE │──────────────────────────────────────────────────┤
+  │  BAR │  TAB-NAVIGATION (38px) — OVERVIEW|TRENDS|EVENTS  │
+  │ (56px│──────────────────────────────────────────────────┤
+  │  )   │  PANEL GRID (flex, fill rest)                    │
+  │      │  ┌────────────────────┐ ┌──────────────────────┐ │
+  │      │  │ Real-time          │ │ Trend & Prediction   │ │
+  │      │  │ Monitoring         │ │                      │ │
+  │      │  ├────────────────────┤ ├──────────────────────┤ │
+  │      │  │ System Diagram     │ │ Control Suggestions  │ │
+  │      │  │ (P&ID flow)        │ │ + Optimization       │ │
+  │      │  └────────────────────┘ └──────────────────────┘ │
+  └──────┴──────────────────────────────────────────────────┘
 
-VENSTRE: Skærmtitel i ALL CAPS
-  <span style="color:#00c8ff;font-size:0.78rem;font-weight:600;letter-spacing:0.12em">SKÆRMTITEL HER</span>
+─── LEFT SIDEBAR (56px bred) ────────────────────────────
+background: #080e1a; border-right: 1px solid rgba(0,200,255,0.12);
+display:flex; flex-direction:column; align-items:center; padding:12px 0; gap:8px;
 
-MIDTEN: Dato + Tid i to separate pills
-  <div style="display:flex;gap:8px;align-items:center">
-    <div style="border:1px solid rgba(0,200,255,0.4);border-radius:20px;padding:4px 14px;
-                color:#00c8ff;font-size:0.75rem;letter-spacing:0.06em">DD/MM/YYYY</div>
-    <div style="border:1px solid rgba(0,200,255,0.4);border-radius:20px;padding:4px 14px;
-                color:#00c8ff;font-size:0.75rem;letter-spacing:0.06em">HH:MM</div>
+Grundfos X-logo øverst (SVG, 28px, color:#0077C8), derefter icon-knapper:
+  <div style="width:40px;height:40px;border-radius:8px;display:flex;align-items:center;
+              justify-content:center;color:#00c8ff;font-size:1.1rem;
+              background:rgba(0,200,255,0.12);border:1px solid rgba(0,200,255,0.3)">⊞</div>
+  Inaktiv variant: color:#5a6a7a; ingen baggrund
+  Ikoner (top→bund): ⊞ (overview) ∿ (trends) ◈ (events) ⚡ (energy) ◉ (alerts) ⚙ (settings) ⌂ (hjem)
+
+─── TOPBAR (48px) ───────────────────────────────────────
+background: #080e1a; border-bottom: 1px solid rgba(0,200,255,0.15);
+padding: 0 20px 0 16px; display:flex; align-items:center; gap:16px;
+
+VENSTRE: Systemidentifikation
+  <div>
+    <div style="color:#a8b8cc;font-size:0.6rem;letter-spacing:0.1em">SYSTEM OVERVIEW</div>
+    <div style="color:#fff;font-size:0.8rem;font-weight:600">sys_XXXXXXXX</div>
+  </div>
+  <div style="color:#5a6a7a;font-size:0.7rem">
+    Location: <span style="color:#00c8ff">site_XX / area_XX</span> &nbsp;|&nbsp;
+    Max Flow: <span style="color:#fff">XXX m³/h</span> &nbsp;|&nbsp;
+    Max Head: <span style="color:#fff">XX m</span>
   </div>
 
-HØJRE: 4 ikon-knapper i separate cyan-bordered firkanter (28×28px):
-  <div style="display:flex;gap:6px">
-    <div style="width:32px;height:32px;border:1px solid rgba(0,200,255,0.4);border-radius:5px;
-                display:flex;align-items:center;justify-content:center;color:#00c8ff;font-size:0.85rem">⊞</div>
-    <!-- gentag for ◫ ⚙ ◉ -->
+HØJRE: Søge-ikon + sprog-vælger + notifikations-bjælke + bruger-pill
+  <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+    <div style="color:#5a6a7a;font-size:1rem">⊕</div>
+    <div style="border:1px solid rgba(0,200,255,0.3);border-radius:4px;padding:3px 10px;
+                color:#a8b8cc;font-size:0.65rem">InternalTest ▾</div>
+    <div style="color:#5a6a7a;font-size:1rem">≡</div>
   </div>
 
-─── BOTTOM NAV BAR ──────────────────────────────────────
-height: 44px; background: #080e1a; border-top: 1px solid rgba(0,200,255,0.2);
-padding: 0 16px; display:flex; align-items:center; justify-content:space-between;
+─── TAB-NAVIGATION (38px) ───────────────────────────────
+background: #0d1421; border-bottom: 1px solid rgba(0,200,255,0.1);
+padding: 0 20px; display:flex; align-items:flex-end; gap:0;
 
-VENSTRE: Tekst-tabs med | separator og AKTIV underline
-  <div style="display:flex;align-items:center;gap:0;height:100%">
-    <div style="padding:0 18px;height:100%;display:flex;align-items:center;
-                color:#00c8ff;font-size:0.68rem;letter-spacing:0.1em;font-weight:600;
-                border-bottom:2px solid #00c8ff">OVERBLIK</div>
-    <div style="color:rgba(0,200,255,0.3);font-size:0.8rem;padding:0 2px">|</div>
-    <div style="padding:0 18px;height:100%;display:flex;align-items:center;
-                color:#5a6a7a;font-size:0.68rem;letter-spacing:0.1em">MAINBOARD</div>
-    <!-- | COOLING | STRØMSTYRING | AVANCEREDE INDSTILLINGER -->
+AKTIV tab:
+  <div style="padding:0 20px;height:38px;display:flex;align-items:center;
+              color:#fff;font-size:0.72rem;font-weight:600;letter-spacing:0.08em;
+              border-bottom:2px solid #00c8ff">OVERVIEW</div>
+
+INAKTIV tab:
+  <div style="padding:0 20px;height:38px;display:flex;align-items:center;
+              color:#5a6a7a;font-size:0.72rem;letter-spacing:0.08em">TRENDS</div>
+
+Tabs (tilpas til konteksten): OVERVIEW | TRENDS | EVENTS | SMART
+
+─── PANEL: REAL-TIME MONITORING ─────────────────────────
+background:#111827; border:1px solid rgba(0,200,255,0.12); border-radius:8px; padding:14px;
+
+Header:
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:12px">
+    <span style="color:#5a6a7a;font-size:0.75rem">⊞</span>
+    <span style="color:#a8b8cc;font-size:0.68rem;letter-spacing:0.1em">REAL TIME MONITORING</span>
+    <div style="margin-left:auto;width:6px;height:6px;border-radius:50%;
+                background:#00d084;box-shadow:0 0 6px #00d084"></div>
   </div>
 
-HØJRE: 5 runde ikon-knapper (28×28px, border: 1px solid rgba(0,200,255,0.3)):
-  Ikoner: ↺ ∿ ⚠ ⊡ ⌂ (genstart, kurve, alarm, data, hjem)
-  AKTIV knap: background: rgba(0,200,255,0.15); border-color: #00c8ff; color: #00c8ff;
+Metrics-grid (4 kolonner):
+  Total Energy | Efficiency | Ratio Grade | Transportation Efficiency
+  Hvert kort: stort tal i Courier New + enhed + kategori-label
+
+─── PANEL: TREND & PREDICTION CHART ─────────────────────
+background:#111827; border:1px solid rgba(0,200,255,0.12); border-radius:8px; padding:14px;
+
+Header med dropdown:
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <span style="color:#a8b8cc;font-size:0.68rem;letter-spacing:0.1em">TREND AND PREDICTION</span>
+    <div style="border:1px solid rgba(0,200,255,0.3);border-radius:4px;padding:2px 8px;
+                color:#a8b8cc;font-size:0.62rem">Load ▾</div>
+    <div style="margin-left:auto;color:#5a6a7a;font-size:0.75rem">⚙</div>
+  </div>
+
+SVG TREND CHART med FAKTISKE + FORUDSAGTE linjer (400×140px):
+  <svg viewBox="0 0 400 140" width="100%" style="overflow:visible">
+    <!-- Vandret grid-linjer -->
+    <line x1="0" y1="28" x2="400" y2="28" stroke="rgba(0,200,255,0.07)" stroke-width="1"/>
+    <line x1="0" y1="70" x2="400" y2="70" stroke="rgba(0,200,255,0.07)" stroke-width="1"/>
+    <line x1="0" y1="112" x2="400" y2="112" stroke="rgba(0,200,255,0.07)" stroke-width="1"/>
+    <!-- Legende øverst højre -->
+    <circle cx="290" cy="12" r="3" fill="#00c8ff"/>
+    <text x="297" y="16" fill="#a8b8cc" font-size="9">monitoring</text>
+    <circle cx="340" cy="12" r="3" fill="#5a8a9a"/>
+    <text x="347" y="16" fill="#a8b8cc" font-size="9">forecasting</text>
+    <!-- FAKTISK linje (solid cyan) -->
+    <polyline points="0,90 50,70 100,80 150,45 200,55 250,35 300,42"
+              fill="none" stroke="#00c8ff" stroke-width="2"/>
+    <!-- FORUDSET linje (stiplet, dæmpet) -->
+    <polyline points="300,42 340,38 380,30 400,25"
+              fill="none" stroke="#5a8a9a" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <!-- Area fill under faktisk linje -->
+    <polyline points="0,90 50,70 100,80 150,45 200,55 250,35 300,42 300,140 0,140"
+              fill="rgba(0,200,255,0.06)" stroke="none"/>
+    <!-- X-akse labels -->
+    <text x="0" y="135" fill="#5a6a7a" font-size="8">JAN</text>
+    <text x="70" y="135" fill="#5a6a7a" font-size="8">FEB</text>
+    <text x="140" y="135" fill="#5a6a7a" font-size="8">MAR</text>
+    <text x="210" y="135" fill="#5a6a7a" font-size="8">APR</text>
+    <text x="280" y="135" fill="#5a6a7a" font-size="8">MAY</text>
+    <text x="350" y="135" fill="#5a6a7a" font-size="8">JUN</text>
+    <!-- Actual/Predict labels -->
+    <text x="0" y="128" fill="#5a6a7a" font-size="8">Actual ◆</text>
+    <text x="60" y="128" fill="#5a6a7a" font-size="8">Predict ◇</text>
+  </svg>
+
+─── PANEL: SYSTEM DIAGRAM (FLOW/P&ID) ───────────────────
+background:#111827; border:1px solid rgba(0,200,255,0.12); border-radius:8px; padding:14px;
+
+Vis flowdiagram med komponenter forbundet med pile. Eksempel på struktur:
+  [Tower] →→→ [Cooling Water] →→→ [Chiller] →→→ [Chilled Water]
+           ↗                              ↗
+  [Pump A]                       [Pump B/C]
+
+SVG-byggeblokke:
+  Komponent-boks: rect fill="#1e2d40" stroke="#00c8ff" stroke-opacity="0.4" rx="4"
+  Flow-pil: stroke="#0077C8" stroke-width="2" marker-end="url(#arrow)"
+  Status-LED: circle fill="#00d084" r="4" — grøn=drift, rød=alarm
+  Komponent-label: text fill="#a8b8cc" font-size="9" text-anchor="middle"
+
+SVG arrow marker (inkludér altid):
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#00c8ff" opacity="0.8"/>
+    </marker>
+  </defs>
+
+─── PANEL: CONTROL SUGGESTIONS + OPTIMIZATION ───────────
+background:#111827; border:1px solid rgba(0,200,255,0.12); border-radius:8px; padding:14px;
+
+CONTROL SUGGESTION — cirkelformat med current→target:
+  <div style="display:flex;align-items:center;gap:12px;padding:10px;
+              background:#0d1421;border-radius:6px;margin-bottom:8px">
+    <div>
+      <div style="color:#a8b8cc;font-size:0.6rem;letter-spacing:0.1em">RETURN WATER TEMPERATURE (°C)</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,200,255,0.15);
+                    border:2px solid #00c8ff;display:flex;align-items:center;justify-content:center;
+                    color:#fff;font-size:0.85rem;font-weight:700">10</div>
+        <div style="color:#00c8ff;font-size:1rem">→</div>
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(0,208,132,0.15);
+                    border:2px solid #00d084;display:flex;align-items:center;justify-content:center;
+                    color:#fff;font-size:0.85rem;font-weight:700">15</div>
+      </div>
+    </div>
+  </div>
+
+OPTIMIZATION OBJECTIVES — current kW → target kW:
+  <div style="padding:10px;background:#0d1421;border-radius:6px">
+    <div style="color:#a8b8cc;font-size:0.6rem;letter-spacing:0.1em;margin-bottom:8px">
+      INSTANTANEOUS POWER
+    </div>
+    <div style="display:flex;align-items:flex-end;gap:20px">
+      <div>
+        <div style="color:#5a6a7a;font-size:0.6rem">Current</div>
+        <div style="color:#fff;font-size:1.6rem;font-family:'Courier New';font-weight:700">220</div>
+        <div style="color:#00c8ff;font-size:0.65rem">kW</div>
+      </div>
+      <div style="color:#00c8ff;font-size:1.2rem;margin-bottom:8px">→→</div>
+      <div>
+        <div style="color:#5a6a7a;font-size:0.6rem">Target</div>
+        <div style="color:#00d084;font-size:1.6rem;font-family:'Courier New';font-weight:700">200</div>
+        <div style="color:#00d084;font-size:0.65rem">kW</div>
+      </div>
+    </div>
+    <!-- Mini sparkline under -->
+  </div>
+
+─── PANEL HEADER STANDARD ───────────────────────────────
+Alle panels bruger samme header-mønster:
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="color:#5a6a7a;font-size:0.75rem">◈</span>
+      <span style="color:#a8b8cc;font-size:0.65rem;letter-spacing:0.1em;font-weight:600">
+        PANEL TITEL HER
+      </span>
+    </div>
+    <div style="color:#5a6a7a;font-size:0.75rem;cursor:pointer">⚙</div>
+  </div>
 
 ━━━ STORE STATUS-TILES (primær visning ved overview-screens) ━━━
 Bruges til at vise anlægsenheder (pumper, stationer, komponenter) som store klikbare tiles.
