@@ -1,223 +1,299 @@
-# Meeting AI Visualizer — CLAUDE.md
+# CLAUDE.md — Meeting AI Visualizer (Grundfos Specialeprojekt)
 
-> Projektets workflow-konfiguration til AI-assistenter (Claude, Cowork).
-> Læs denne fil først. Den definerer regler, stack, tilgængelige tools og arbejdsflow.
+> Læs denne fil FØR du gør noget som helst. Den indeholder alt hvad du behøver at vide om projektet, reglerne og de tilgængelige tools.
 
 ---
 
-## Projekt
+## Hvad er dette projekt?
 
-**Navn:** Meeting AI Visualizer
-**Formål:** Realtids-transskription og AI-genereret HTML-visualisering til møder hos Grundfos.
-**Status:** Aktiv prototype — videreudvikles iterativt.
+**Meeting AI Visualizer** er et specialeprojektværktøj til brug i møder og workshops hos **Grundfos** (dansk pumpeproducent, global).
 
-**Primær fil til at forstå projektet:** `CONTEXT.md`
+Formål: Realtids-transskription af dansk tale → automatisk AI-genereret HTML-visualisering → delt live med alle mødedeltagere på tværs af enheder.
+
+**Live deployment:** `https://specialev-rkt-j-production.up.railway.app`
+**GitHub:** `https://github.com/wiborg1992/specialev-rkt-j`
+**Bruger:** Jakob (jpe064@gmail.com)
+
+---
+
+## Arkitektur
+
+```
+Browser (index.html)
+  ├── Venstre panel: Transskription
+  │     ├── Web Speech API (Browser-tilstand, da-DK)
+  │     └── AssemblyAI v3 Streaming (AssemblyAI-tilstand, u3-rt-pro)
+  │           └── /api/assemblyai-token → GET streaming.assemblyai.com/v3/token
+  │
+  ├── Højre panel: AI Visualisering
+  │     └── <iframe> med Claude-genereret HTML (ALDRIG innerHTML — se regel nedenfor)
+  │
+  └── Jitsi opkald (flydende vindue, meet.jit.si)
+
+server.js (Node.js, ingen frameworks)
+  ├── GET  /                     → public/index.html
+  ├── POST /api/visualize        → Anthropic API (claude-sonnet-4-6) → streaming SSE
+  ├── GET  /api/assemblyai-token → AssemblyAI v3 token
+  ├── GET  /api/history          → mødehistorik (in-memory)
+  ├── GET  /api/sse              → Server-Sent Events (multi-user sync)
+  └── POST /api/segment          → modtag tale-segment, broadcast til rum
+
+Multi-user rum-system:
+  - 6-tegns rum-kode (f.eks. "243A65")
+  - SSE broadcaster: transskription, visualisering, deltager-liste
+  - Hvert browser har sin egen transskription; visualisering deles til alle
+```
+
+---
+
+## Filstruktur
+
+```
+specialev-rkt-j/               ← PRIMÆR APP-KODEBASE
+├── CLAUDE.md                  ← DENNE FIL — læs først
+├── CONTEXT.md                 ← projektkontekst (uddybende)
+├── CHANGELOG.md               ← historik over alle ændringer
+├── TEST_CASES.md              ← 6 test-transskriptioner til validering
+├── PROMPT_LOG.md              ← dokumentation af system prompt
+├── server.js                  ← Node.js backend (907 linjer)
+├── server.py                  ← Python-alternativ (ubrugt i prod)
+├── public/
+│   └── index.html             ← HELE frontend (2086 linjer — skal splittes)
+├── railway.json               ← Railway deployment config
+├── package.json               ← npm (node + dotenv)
+├── .env                       ← API-nøgler (ALDRIG i git)
+└── .env.example               ← skabelon til .env
+
+Claude/                        ← WORKFLOW-FUNDAMENT (parent-mappe)
+├── specialev-rkt-j/           ← denne app
+├── everything-claude-code/    ← regler, commands, skills (læs disse!)
+└── ui-ux-pro-max-skill/       ← design system search tool (brug altid ved UI)
+```
+
+---
+
+## Environment Variables
+
+```
+ANTHROPIC_API_KEY=...   # Claude API (Anthropic)
+ASSEMBLYAI_API_KEY=...  # AssemblyAI streaming transcription
+PORT=3000
+```
+
+Sat i Railway Variables (production) og i `.env` (local).
 
 ---
 
 ## Tech Stack
 
-| Lag | Teknologi |
-|-----|-----------|
-| Backend (primær) | Node.js 22+, `server.js` (Express-lignende, ingen tunge deps) |
-| Backend (alternativ) | Python, `server.py` |
-| Frontend | Vanilla HTML/CSS/JS — ingen frameworks |
-| AI | Anthropic API, model: `claude-sonnet-4-6` |
-| Transskription | Web Speech API (`da-DK`), kun Chrome/Edge |
-| Hosting | Railway (`railway.json`) |
-| Design | Grundfos brand (navy `#002A5C`, blå `#0077C8`) |
-
-**Designbeslutning (opdateret):** HTML-output renderes i en `<iframe>` via `contentDocument.write()` under streaming, og via `innerHTML` ved visning af færdigt output. Begge metoder understøtter `<style>`-blokke i moderne Chrome.
-
-**Nuværende SYSTEM_PROMPT output-format:** `<style>/* al CSS øverst */</style><div>/* HTML herunder */</div>` — `<style>`-blokke giver rigere CSS (keyframes, media queries, pseudo-selectors) og foretrækkes frem for inline CSS på hvert element. *(Tidligere dokumenteret som "brug altid inline CSS" — denne begrænsning er ophævet.)*
+| Lag | Teknologi | Note |
+|-----|-----------|------|
+| Backend | Node.js 22+, vanilla HTTP | Ingen Express — kun http modul |
+| Frontend | Vanilla HTML/CSS/JS | Ingen React, ingen bundler |
+| AI | Anthropic claude-sonnet-4-6 | Streaming SSE til klient |
+| Transskription | Web Speech API + AssemblyAI v3 | u3-rt-pro Universal model |
+| Hosting | Railway | Auto-deploy fra GitHub main |
+| Video-call | Jitsi Meet (meet.jit.si) | Embedded iframe |
 
 ---
 
-## Tilgængelige Workflow-Tools
+## KRITISKE REGLER
 
-### 1. UI/UX Pro Max Skill (AKTIV)
+### REGEL 1: Visualisering SKAL renderes i iframe — ALDRIG innerHTML
+Genererede HTML-visualiseringer indeholder style-blokke med bl.a. `body { background: #0d1421 }`.
+Injektion via innerHTML ødelægger HELE appens layout og CSS.
 
-**Brug ALTID denne skill ved UI-opgaver.**
+KORREKT: Opret iframe, brug contentDocument.write(html), derefter contentDocument.close()
+FORKERT: vizContainer.innerHTML = html
 
-Triggeres automatisk af Cowork ved design-opgaver, men kan også kaldes eksplicit:
+showVisualization() og startLiveRender() bruger begge iframe korrekt pr. marts 2026.
 
-```bash
-# Generér design system (kør ALTID som første skridt ved UI-arbejde)
-python3 ../ui-ux-pro-max-skill/src/ui-ux-pro-max/scripts/search.py \
-  "dashboard data visualization dark mode SaaS" --design-system -p "Meeting AI Visualizer"
+### REGEL 2: AssemblyAI v3 API — IKKE v2 (v2 er deprecated)
+- Token endpoint: GET https://streaming.assemblyai.com/v3/token?expires_in_seconds=480
+- WebSocket: wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&speech_model=u3-rt-pro&format_turns=true&token=...
+- Lyd: rå binær PCM Int16Array — IKKE base64 JSON
+- Beskeder bruger: end_of_turn, turn_is_formatted, transcript — IKKE message_type
+- Tilføj IKKE language_code=da — u3-rt-pro er Universal model, parameteren crasher forbindelsen
 
-# Gem design system persistent
-python3 ../ui-ux-pro-max-skill/src/ui-ux-pro-max/scripts/search.py \
-  "dashboard visualization dark mode" --design-system --persist -p "Meeting AI Visualizer"
+### REGEL 3: .env commits ALDRIG
+.gitignore inkluderer .env. Brug altid `git add <specifikke filer>` — aldrig git add -A.
 
-# Søg i specifikke domæner
-python3 ../ui-ux-pro-max-skill/src/ui-ux-pro-max/scripts/search.py \
-  "animation loading" --domain ux
+### REGEL 4: Git push kræver PAT
+VM har ingen gemt GitHub-credential. Push med:
+  git push https://TOKEN@github.com/wiborg1992/specialev-rkt-j.git main
+Generer nyt PAT på github.com/settings/tokens hvis det fejler.
 
-# Brug stack-specifikke guidelines (dette projekt: html-tailwind eller plain HTML)
-python3 ../ui-ux-pro-max-skill/src/ui-ux-pro-max/scripts/search.py \
-  "responsive layout" --stack html-tailwind
-```
-
-**Obligatorisk ved disse opgavetyper:**
-- Nye UI-komponenter (knapper, panels, kort, modaler)
-- Farvepaletter og typografi
-- Layout og responsivitet
-- Animationer og loading states
-- Accessibility-review
-- Design af nye sider eller sektioner i `public/index.html`
-
-**Grundfos-specifikke krav til UI:**
-- Primær farve: `#002A5C` (navy)
-- Accent: `#0077C8` (blå)
-- Kortbaggrund (mørk): `#252535`
-- Al HTML-output skal bruge inline CSS
-- Prototype-badge skal være synlig for mødedeltagere
+### REGEL 5: Railway auto-deployer fra GitHub main
+Push til main → Railway deployer automatisk inden for ca. 60 sekunder.
 
 ---
 
-### 2. Stitch MCP (AKTIV)
+## Workflow (fra everything-claude-code)
 
-Stitch er Googles UI-prototyping tool, koblet via MCP (`@_davideast/stitch-mcp`).
+Læs og følg disse mønstre. De ligger i ../everything-claude-code/commands/ og ../everything-claude-code/rules/common/
 
-**Konfiguration:** Se `.mcp.json` i projektets rod.
+### Ny feature → Plan først
+Læs: ../everything-claude-code/commands/plan.md
+Fremgangsmåde:
+1. Formulér krav tydeligt
+2. Identificér risici
+3. Lav trin-for-trin plan
+4. Vent på brugerbekræftelse FØR kode skrives
 
-**Brug til:**
-- Hurtig UI-prototype af nye skærmbilleder
-- Generér HTML-mockups fra designbeskrivelser
-- Preview af visualiseringskomponenter
+### Fejlfix → Build-fix mønstret
+Læs: ../everything-claude-code/commands/build-fix.md
+- Fix én fejl ad gangen
+- Re-test efter hver ændring
+- Stop og spørg hvis samme fejl vedvarer efter 3 forsøg
 
-**Verificer forbindelse:**
-```bash
-npx @_davideast/stitch-mcp doctor --verbose
-npx @_davideast/stitch-mcp tool
-```
+### Kode-stil (fra rules/common/coding-style.md)
+- Filer max 800 linjer (index.html er 2086 — SKAL splittes)
+- Funktioner max 50 linjer
+- Fejlhåndtering ved ALLE async-kald
+- Ingen hardkodede værdier — brug konstanter
+- Immutable patterns — undgå mutation
 
-**Dokumentation:** `../stitch-mcp/docs/`
+### Git (fra rules/common/git-workflow.md)
+Commit-format:
+  feat: tilføj ny funktion
+  fix: ret specifik fejl
+  refactor: omstrukturér uden funktionsændring
+  docs: opdater dokumentation
 
----
-
-### 3. Everything Claude Code — Tilgængelige Commands
-
-Følgende slash-commands er tilgængelige via `.claude/commands/`:
-
-| Command | Brug |
-|---------|------|
-| `/plan` | Planlæg en ny feature eller ændring |
-| `/tdd` | Test-drevet udvikling |
-| `/code-review` | Kvalitets- og sikkerhedsgennemgang |
-| `/build-fix` | Fix build- eller runtime-fejl |
-| `/refactor-clean` | Fjern dead code og ryd op |
-| `/learn` | Udtræk mønstre fra sessionen |
-| `/checkpoint` | Gem verification state |
-| `/verify` | Kør verification loop |
-| `/update-docs` | Synkronisér dokumentation |
-
----
-
-## Workflow-Regler (fra everything-claude-code common/rules)
-
-### Generelt
-
-- **Læs `CONTEXT.md` og `PROMPT_LOG.md` inden du laver ændringer** i server-logik eller AI-prompts.
-- **Læs `CHANGELOG.md`** for at forstå hvad der allerede er forsøgt og besluttet.
-- **Brug `TEST_CASES.md`** til at validere ændringer i visualiseringslogikken.
-- Skriv aldrig over eksisterende filer uden at begrunde det.
-- Tilføj altid til `CHANGELOG.md` ved substantielle ændringer.
-
-### Kode
-
-- Prioritér læsbarhed og simplicitet — dette er en prototype.
-- Ingen unødvendige dependencies — `package.json` er bevidst minimal.
-- Inline CSS i al HTML der genereres af Claude (teknisk krav, se CONTEXT.md).
-- Brug `node --watch server.js` til development.
-
-### UI/Design
-
-- **Brug altid UI/UX Pro Max Skill** ved design-relaterede opgaver (se sektion ovenfor).
-- Match altid Grundfos brand-farver.
-- Alle HTML-visualiseringer skal fungere uden external assets.
-- Test i Chrome (primær browser for Web Speech API).
-
-### Git
-
-- Commit-beskeder på dansk eller engelsk.
-- Brug præfikser: `feat:`, `fix:`, `refactor:`, `docs:`, `style:`.
-- Test altid i browser inden commit.
-
-### Sikkerhed
-
-- `.env` må aldrig committes (allerede i `.gitignore`).
-- API-nøgler kun via environment variables.
-- Ingen brugerdata lagres (stateless arkitektur).
+### Sikkerhed (fra rules/common/security.md)
+Før enhver commit:
+- Ingen API-nøgler i kode
+- Alle bruger-inputs valideres server-side
+- Fejlbeskeder afslører ikke interne stier eller nøgler
+- Rate limiting på /api/visualize (allerede implementeret i server.js)
 
 ---
 
-## Mappestruktur (hele Claude-mappen)
+## UI-Arbejde: Brug altid ui-ux-pro-max-skill
 
-```
-Desktop/Claude/
-├── specialev-rkt-j/          ← DETTE ER HOVEDPROJEKTET
-│   ├── CLAUDE.md             ← denne fil
-│   ├── CONTEXT.md            ← projektkontekst (læs først)
-│   ├── PROMPT_LOG.md         ← AI-prompt dokumentation
-│   ├── CHANGELOG.md          ← historik
-│   ├── TEST_CASES.md         ← testeksempler
-│   ├── server.js             ← Node.js backend
-│   ├── server.py             ← Python-alternativ
-│   ├── public/index.html     ← frontend
-│   ├── .mcp.json             ← Stitch MCP konfiguration
-│   ├── .env.example          ← miljøvariabel-skabelon
-│   └── .claude/
-│       ├── rules/            ← everything-claude-code common rules
-│       └── commands/         ← tilgængelige slash-commands
-│
-├── everything-claude-code/   ← WORKFLOW-FUNDAMENT
-│   ├── skills/               ← 65+ skills til brug ved behov
-│   ├── commands/             ← 40 commands (fuldt sæt)
-│   ├── rules/                ← regler (common + typescript + python)
-│   ├── agents/               ← specialiserede agenter
-│   ├── hooks/                ← automation hooks
-│   └── examples/             ← CLAUDE.md-eksempler
-│
-├── ui-ux-pro-max-skill/      ← DESIGN SKILL (AKTIV)
-│   └── src/ui-ux-pro-max/
-│       └── scripts/search.py ← CLI-tool til design system
-│
-└── stitch-mcp/               ← STITCH MCP REFERENCE
-    └── docs/                 ← fuld dokumentation
-```
+Inden ENHVER UI-opgave (nye komponenter, layout, farver, animationer) — kør:
+
+  python3 ../ui-ux-pro-max-skill/src/ui-ux-pro-max/scripts/search.py \
+    "industrial IoT dashboard dark mode real-time monitoring" \
+    --design-system -p "Grundfos Meeting Visualizer" --format markdown
+
+Andre søgninger:
+  # Specifikke komponenter
+  python3 ../ui-ux-pro-max-skill/src/ui-ux-pro-max/scripts/search.py \
+    "data visualization gauge chart dark" --domain chart
+
+  # UX-mønstre
+  python3 ../ui-ux-pro-max-skill/src/ui-ux-pro-max/scripts/search.py \
+    "real-time collaboration notification" --domain ux
 
 ---
 
-## Næste Udviklingsområder
+## Grundfos Brand
 
-### Umiddelbare (klar til test)
-- **Tilføj `ANTHROPIC_API_KEY`** til `.env` — server starter ikke uden den
-- **Test TC-01** med `test-viz-tc01.html` som reference — åbn filen i Chrome, kør derefter live test
-- Validering med rigtige Grundfos-transskriptioner
+App-interface farver:
+  #002A5C  → Primær navy (headers, topbar, baggrunde)
+  #0077C8  → Sekundær blå (accenter, knapper, aktive states)
+  #E8F4FD  → Lys blå (kortbaggrunde lys tema)
+  #333333  → Mørkegrå tekst
+  #F5F5F5  → Neutral lysegrå
 
-### Kommende features (fra `CONTEXT.md`)
-- Stitch runtime integration i `server.js` (aftalt under Mulighed B)
-- Gem/eksport-funktion
-- Historik over visualiseringer i session
-- Hosting til brug på tværs af enheder (ngrok eller Railway)
-- Justerbart auto-visualiserings-interval
+HMI/SCADA farvepalette (til AI-genererede visualiseringer i server.js SYSTEM_PROMPT):
+  #0d1421  → App baggrund (meget mørk navy)
+  #111827  → Panel primær
+  #141e2e  → Panel sekundær / kort
+  #00c8ff  → Cyan primær (interaktiv feedback, ikoner)
+  #ffffff  → Tekst primær
+  #a8b8cc  → Tekst sekundær
+  #00d084  → Status OK/Drift (grøn)
+  #ffb800  → Status Advarsel (amber)
+  #ff4757  → Status Alarm (rød)
 
 ---
 
-## Hurtig Start (development)
+## System Prompt (server.js linje 132)
 
-```bash
-# Kopiér miljøvariabler
-cp .env.example .env
-# Tilføj din ANTHROPIC_API_KEY i .env
+Claude genererer HTML-visualiseringer fra mødetransskription.
 
-# Start server
-npm run dev
-# eller
-node --watch server.js
+Aktiveret funktionalitet:
+- Grundfos brand + HMI/SCADA design language
+- Pump-domæne: flow (m³/h), tryk (bar), NPSH, IE-klasse, centrifugalpumpe, BMS
+- HMI interface: aktiveres ved tekniske termer — genererer interface der ligner Grundfos iSolutions Suite
+- Multi-deltager: identificerer [Navn]: tekst format
+- Inkrementel tilstand: ved isIncremental=true bygger Claude videre på previousViz
 
-# Åbn i Chrome
-# http://localhost:3000
-```
+Output-format: <style>CSS her</style><div>HTML her</div>
+Renderes altid i iframe (se Regel 1).
+
+---
+
+## Inkrementelle Visualiseringer
+
+Konstant: WORDS_TO_TRIGGER = 40 (i index.html)
+
+Flow:
+1. scheduleAutoViz() kaldes ved hvert nyt transskript-segment
+2. Tæller nye ord siden sidst trigger
+3. Ved 40+ ord: triggerVisualize(isAuto = true)
+4. Sender { isIncremental: true, previousViz: currentVizHtml } til server
+5. Claude opdaterer eksisterende prototype — starter ikke forfra
+
+Manuel viz: knappen "Visualisér" sender altid isIncremental: false.
+
+---
+
+## Multi-User Rum-System
+
+Rum oprettes automatisk (6-tegns kode, f.eks. "243A65").
+Del-link: ?room=243A65
+
+SSE events:
+  segment       → ny transskriptions-linje → broadcast til alle i rummet
+  visualization → ny HTML-visualisering → broadcast til alle
+  participants  → opdateret deltager-liste
+
+---
+
+## Kendte Issues / Teknisk Gæld
+
+index.html er 2086 linjer     → HØJTPRIORITERET refaktorering
+Historik in-memory kun        → mistes ved server-restart
+Ingen rigtige Grundfos-data   → afventer rigtige møder
+
+---
+
+## Næste Prioriterede Opgaver
+
+1. Split index.html i moduler: transcription.js, visualization.js, room.js, call.js
+2. Stitch MCP runtime integration (aftalt Mulighed B, ikke implementeret)
+3. Persistent mødehistorik (fil eller SQLite)
+4. AssemblyAI speaker labels (u3-rt-pro understøtter tale-attribution)
+
+---
+
+## Hurtig Start (lokal dev)
+
+  cd specialev-rkt-j
+  cp .env.example .env
+  # Udfyld ANTHROPIC_API_KEY og ASSEMBLYAI_API_KEY
+  node --watch server.js
+  # Åbn http://localhost:3000 i Chrome
+
+---
+
+## Everything-Claude-Code Reference
+
+Commands (læs og følg mønstrene):
+  ../everything-claude-code/commands/plan.md           ← ny feature
+  ../everything-claude-code/commands/build-fix.md      ← fejlfix
+  ../everything-claude-code/commands/code-review.md    ← kode-review
+  ../everything-claude-code/commands/refactor-clean.md ← oprydning
+  ../everything-claude-code/commands/tdd.md            ← test-drevet
+  ../everything-claude-code/commands/verify.md         ← verifikation
+  ../everything-claude-code/commands/update-docs.md    ← opdater CHANGELOG
+
+Regler der altid gælder:
+  ../everything-claude-code/rules/common/coding-style.md
+  ../everything-claude-code/rules/common/development-workflow.md
+  ../everything-claude-code/rules/common/git-workflow.md
+  ../everything-claude-code/rules/common/security.md
+  ../everything-claude-code/rules/common/testing.md
