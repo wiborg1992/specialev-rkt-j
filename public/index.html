@@ -1224,7 +1224,7 @@
       aaiProcessor = aaiAudioCtx.createScriptProcessor(4096, 1, 1);
 
       // 4) Connect to AssemblyAI v3 WebSocket (Universal Streaming — u3-rt-pro understøtter dansk)
-      const wsUrl = `wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&speech_model=u3-rt-pro&language_code=da&format_turns=true&token=${token}`;
+      const wsUrl = `wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&speech_model=u3-rt-pro&format_turns=true&token=${token}`;
       aaiSocket = new WebSocket(wsUrl);
 
       aaiSocket.onopen = () => {
