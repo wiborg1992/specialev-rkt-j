@@ -1224,7 +1224,7 @@
       aaiProcessor = aaiAudioCtx.createScriptProcessor(4096, 1, 1);
 
       // 4) Connect to AssemblyAI v3 WebSocket (Universal Streaming — u3-rt-pro understøtter dansk)
-      const wsUrl = `wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&speech_model=u3-rt-pro&format_turns=true&token=${token}`;
+      const wsUrl = `wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&speech_model=u3-rt-pro&language_code=da&format_turns=true&token=${token}`;
       aaiSocket = new WebSocket(wsUrl);
 
       aaiSocket.onopen = () => {
@@ -1600,7 +1600,14 @@
     }
     function showVisualization(h, id, title) {
       currentMeetingId = id || null;
-      vizContainer.innerHTML = `<div class="viz-output">${h}</div>`;
+      vizContainer.innerHTML = '';
+      const vizIframe = document.createElement('iframe');
+      vizIframe.className = 'viz-output';
+      vizIframe.style.cssText = 'width:100%;min-height:70vh;border:none;display:block;border-radius:var(--radius-xl);';
+      vizContainer.appendChild(vizIframe);
+      vizIframe.contentDocument.open();
+      vizIframe.contentDocument.write(h);
+      vizIframe.contentDocument.close();
       // Update subtitle with meeting title if available
       if (vizPanelSub) {
         vizPanelSub.textContent = title
@@ -1940,17 +1947,9 @@
 
     // ── Export visualization ──────────────────────────────────────────────────
     function exportVisualization() {
-      const output = vizContainer.querySelector('.viz-output');
-      if (!output) { showShareToast(); return; }
+      if (!currentVizHtml) { showShareToast(); return; }
       const meetTitle = titleInput.value.trim() || 'møde-visualisering';
-      const fullHtml = `<!DOCTYPE html>
-<html lang="da">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(meetTitle)} · Grundfos AI</title>
-<style>body{margin:0;background:#f4f7fd;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}</style>
-</head>
-<body>${output.innerHTML}</body>
-</html>`;
+      const fullHtml = currentVizHtml;
       const blob = new Blob([fullHtml], { type: 'text/html' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
