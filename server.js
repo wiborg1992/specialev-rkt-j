@@ -845,13 +845,12 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify({ error: 'ASSEMBLYAI_API_KEY ikke sat på serveren.' }));
     }
     try {
-      const tokenRes = await fetch('https://api.assemblyai.com/v2/realtime/token', {
-        method:  'POST',
-        headers: { Authorization: ASSEMBLYAI_API_KEY, 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ expires_in: 480 }),
+      const tokenRes = await fetch('https://streaming.assemblyai.com/v3/token?expires_in_seconds=480', {
+        method:  'GET',
+        headers: { Authorization: ASSEMBLYAI_API_KEY },
       });
       const tokenData = await tokenRes.json();
-      if (!tokenRes.ok) throw new Error(tokenData.error || 'Token-fejl');
+      if (!tokenRes.ok) throw new Error(tokenData.error || tokenData.message || 'Token-fejl');
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ token: tokenData.token }));
     } catch (err) {

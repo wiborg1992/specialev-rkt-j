@@ -1223,8 +1223,8 @@
       const source = aaiAudioCtx.createMediaStreamSource(aaiMicStream);
       aaiProcessor = aaiAudioCtx.createScriptProcessor(4096, 1, 1);
 
-      // 4) Connect to AssemblyAI WebSocket
-      const wsUrl = `wss://api.assemblyai.com/v2/realtime/ws?sample_rate=16000&language_code=da&token=${token}`;
+      // 4) Connect to AssemblyAI v3 WebSocket (Universal Streaming — u3-rt-pro understøtter dansk)
+      const wsUrl = `wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&speech_model=u3-rt-pro&format_turns=true&token=${token}`;
       aaiSocket = new WebSocket(wsUrl);
 
       aaiSocket.onopen = () => {
@@ -1239,12 +1239,8 @@
           for (let i = 0; i < float32.length; i++) {
             int16[i] = Math.max(-32768, Math.min(32767, float32[i] * 32768));
           }
-          // Base64 encode and send
-          const bytes = new Uint8Array(int16.buffer);
-          let binary = '';
-          for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-          const b64 = btoa(binary);
-          aaiSocket.send(JSON.stringify({ audio_data: b64 }));
+          // Send raw binary PCM (v3 API expects binary, ikke base64)
+          aaiSocket.send(int16.buffer);
         };
         source.connect(aaiProcessor);
         aaiProcessor.connect(aaiAudioCtx.destination);
@@ -1253,13 +1249,13 @@
       aaiSocket.onmessage = (evt) => {
         let msg;
         try { msg = JSON.parse(evt.data); } catch { return; }
-        if (!msg.text) return;
 
-        const isFinal = msg.message_type === 'FinalTranscript';
-        const speaker = msg.words?.[0]?.speaker ? ' [Taler ' + msg.words[0].speaker + ']' : '';
+        // v3 API: { turn_order, end_of_turn, turn_is_formatted, transcript, words: [{text, word_is_final}] }
+        if (msg.transcript === undefined) return;
 
-        if (isFinal) {
-          const text = msg.text.trim();
+        if (msg.end_of_turn && msg.turn_is_formatted) {
+          // Formateret final transcript — brug denne (har tegnsætning og store bogstaver)
+          const text = msg.transcript.trim();
           if (!text) return;
           const normalized = normalizeRegulatoryTerms(text);
           roomSegments.push({ name: userName || 'Mig', text: normalized, isMine: true });
@@ -1268,10 +1264,14 @@
           postSegment(normalized);
           scheduleAutoViz();
           renderRoomTranscript('');
+        } else if (msg.end_of_turn && !msg.turn_is_formatted) {
+          // Uformateret end_of_turn — vis som interim til formateret version ankommer
+          interimText = msg.transcript;
+          renderRoomTranscript(msg.transcript);
         } else {
-          // Partial transcript
-          interimText = msg.text;
-          renderRoomTranscript(msg.text);
+          // Løbende partial — vis som interim
+          interimText = msg.transcript;
+          renderRoomTranscript(msg.transcript);
         }
       };
 
