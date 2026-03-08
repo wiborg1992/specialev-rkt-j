@@ -806,6 +806,35 @@
     body.teams-stage .viz-container { padding: 28px; }
     body.teams-content .teams-badge { display: inline-block !important; }
 
+    /* ─── Viz edit mode ─── */
+    .btn-edit-viz { font-size: .9rem !important; }
+    .btn-edit-viz.active { background: #2563eb !important; color: #fff !important; }
+
+    </style>
+    <style id="viz-edit-toolbar-style">
+    /* injected toolbar lives in parent doc */
+    #__viz-float-toolbar {
+      position: fixed; z-index: 99999;
+      background: #1e293b; border-radius: 10px; padding: 5px 8px;
+      display: none; align-items: center; gap: 4px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.45);
+      font-family: system-ui, sans-serif;
+      pointer-events: all;
+    }
+    #__viz-float-toolbar button {
+      background: none; border: none; color: #e2e8f0; cursor: pointer;
+      padding: 3px 7px; border-radius: 5px; font-size: .72rem;
+      font-family: system-ui; transition: background .1s;
+    }
+    #__viz-float-toolbar button:hover { background: #334155; }
+    #__viz-float-toolbar button.danger { color: #f87171; }
+    #__viz-float-toolbar .tb-sep { width: 1px; height: 18px; background: #334155; margin: 0 2px; }
+    #__viz-float-toolbar input[type=color] {
+      width: 22px; height: 22px; border: none; border-radius: 4px;
+      cursor: pointer; padding: 1px; background: #334155;
+    }
+    #__viz-float-toolbar label { font-size: .6rem; color: #94a3b8; margin-right: 1px; }
+
     /* ─── Action items panel ─── */
     .actions-bar {
       padding: 8px 14px; border-bottom: 1px solid var(--border-2);
@@ -1043,6 +1072,7 @@
         </div>
         <span class="meeting-id-badge" id="meetingIdBadge"></span>
         <div class="ph-actions">
+          <button class="btn-ph-action btn-edit-viz" id="btnEditViz" title="Redigér visualisering (klik/dobbeltklik på elementer)" onclick="toggleVizEditMode()">✎</button>
           <button class="btn-ph-action" id="btnShareMeeting" title="Kopier delings-link" onclick="shareCurrentMeeting()" style="display:none;">🔗</button>
           <button class="btn-ph-action" id="btnExportViz"    title="Eksportér som HTML-fil" onclick="exportVisualization()">↓</button>
           <button class="btn-ph-action" id="btnFullscreen"   title="Fuldskærm" onclick="toggleFullscreen()">⛶</button>
@@ -1996,6 +2026,274 @@
     }
 
     // ── Share room link ────────────────────────────────────────────────────────
+    // ── Viz edit mode ─────────────────────────────────────────────────────────
+    let vizEditMode = false;
+
+    function toggleVizEditMode() {
+      vizEditMode = !vizEditMode;
+      const btn = document.getElementById('btnEditViz');
+      btn.classList.toggle('active', vizEditMode);
+      btn.title = vizEditMode ? 'Afslut redigering' : 'Redigér visualisering';
+      const iframe = vizContainer.querySelector('iframe.viz-output');
+      if (!iframe) { vizEditMode && alert('Generér en visualisering først.'); return; }
+      if (vizEditMode) {
+        injectVizEditor(iframe);
+      } else {
+        removeVizEditor(iframe);
+      }
+    }
+
+    function injectVizEditor(iframe) {
+      const doc = iframe.contentDocument;
+      if (!doc) return;
+      // Listen for edits posted from iframe
+      window.addEventListener('message', onVizMessage);
+
+      const script = doc.createElement('script');
+      script.id = '__viz-editor-script';
+      script.textContent = getVizEditorScript();
+      doc.body.appendChild(script);
+    }
+
+    function removeVizEditor(iframe) {
+      window.removeEventListener('message', onVizMessage);
+      const doc = iframe.contentDocument;
+      if (!doc) return;
+      // Remove editor artifacts
+      doc.querySelectorAll('#__viz-editor-badge, #__viz-toolbar-inner').forEach(el => el.remove());
+      doc.querySelectorAll('[data-orig-outline]').forEach(el => {
+        el.style.outline = el.getAttribute('data-orig-outline') || '';
+        el.removeAttribute('data-orig-outline');
+      });
+      doc.querySelectorAll('[contenteditable]').forEach(el => {
+        el.contentEditable = 'false';
+        el.removeAttribute('contenteditable');
+      });
+    }
+
+    function onVizMessage(e) {
+      if (e.data && e.data.type === 'viz-edit') {
+        // Capture updated HTML from iframe into currentVizHtml
+        const iframe = vizContainer.querySelector('iframe.viz-output');
+        if (iframe && iframe.contentDocument) {
+          currentVizHtml = '<!DOCTYPE html>' + iframe.contentDocument.documentElement.outerHTML;
+        }
+      }
+    }
+
+    // ── Floating toolbar (lives in parent frame, overlays iframe) ─────────────
+    let __floatToolbar = null;
+    let __floatTarget  = null;  // { iframe, el }
+
+    function getOrCreateFloatToolbar() {
+      if (__floatToolbar) return __floatToolbar;
+      const t = document.createElement('div');
+      t.id = '__viz-float-toolbar';
+      t.innerHTML = `
+        <label>Txt</label><input type="color" id="__fbt-color" title="Tekstfarve">
+        <label>Bg</label><input type="color" id="__fbt-bg" title="Baggrundsfarve">
+        <div class="tb-sep"></div>
+        <button id="__fbt-bold" title="Fed"><b>B</b></button>
+        <button id="__fbt-italic" title="Kursiv"><i>I</i></button>
+        <div class="tb-sep"></div>
+        <button id="__fbt-up" title="Flyt op">↑</button>
+        <button id="__fbt-down" title="Flyt ned">↓</button>
+        <div class="tb-sep"></div>
+        <button id="__fbt-del" class="danger" title="Slet element">✕</button>
+      `;
+      document.body.appendChild(t);
+      __floatToolbar = t;
+
+      // Bind buttons
+      t.querySelector('#__fbt-color').oninput = e => {
+        if (__floatTarget) { __floatTarget.el.style.color = e.target.value; notifyIframeChange(); }
+      };
+      t.querySelector('#__fbt-bg').oninput = e => {
+        if (__floatTarget) { __floatTarget.el.style.background = e.target.value; notifyIframeChange(); }
+      };
+      t.querySelector('#__fbt-bold').onclick = () => {
+        if (__floatTarget) {
+          const fw = window.getComputedStyle(__floatTarget.el).fontWeight;
+          __floatTarget.el.style.fontWeight = (parseInt(fw) >= 700) ? '400' : '700';
+          notifyIframeChange();
+        }
+      };
+      t.querySelector('#__fbt-italic').onclick = () => {
+        if (__floatTarget) {
+          const fs = window.getComputedStyle(__floatTarget.el).fontStyle;
+          __floatTarget.el.style.fontStyle = fs === 'italic' ? 'normal' : 'italic';
+          notifyIframeChange();
+        }
+      };
+      t.querySelector('#__fbt-up').onclick = () => {
+        if (__floatTarget) {
+          const el = __floatTarget.el;
+          const prev = el.previousElementSibling;
+          if (prev) { el.parentNode.insertBefore(el, prev); notifyIframeChange(); repositionToolbar(__floatTarget.el); }
+        }
+      };
+      t.querySelector('#__fbt-down').onclick = () => {
+        if (__floatTarget) {
+          const el = __floatTarget.el;
+          const next = el.nextElementSibling;
+          if (next) { el.parentNode.insertBefore(next, el); notifyIframeChange(); repositionToolbar(__floatTarget.el); }
+        }
+      };
+      t.querySelector('#__fbt-del').onclick = () => {
+        if (__floatTarget) { __floatTarget.el.remove(); hideFloatToolbar(); notifyIframeChange(); }
+      };
+      // Click outside hides toolbar
+      document.addEventListener('click', e => {
+        if (!t.contains(e.target)) {
+          const iframe = vizContainer.querySelector('iframe.viz-output');
+          if (!iframe || !iframe.contains(e.target)) hideFloatToolbar();
+        }
+      });
+      return t;
+    }
+
+    function showFloatToolbar(iframe, el) {
+      __floatTarget = { iframe, el };
+      const t = getOrCreateFloatToolbar();
+      repositionToolbar(el);
+      t.style.display = 'flex';
+      // Sync colour pickers
+      const cs = iframe.contentWindow.getComputedStyle(el);
+      t.querySelector('#__fbt-color').value = rgbToHex(cs.color) || '#000000';
+      t.querySelector('#__fbt-bg').value = rgbToHex(cs.backgroundColor) || '#ffffff';
+    }
+
+    function hideFloatToolbar() {
+      if (__floatToolbar) __floatToolbar.style.display = 'none';
+      if (__floatTarget && __floatTarget.el) {
+        __floatTarget.el.style.outline = '';
+        __floatTarget.el.style.outlineOffset = '';
+      }
+      __floatTarget = null;
+    }
+
+    function repositionToolbar(el) {
+      const iframe = vizContainer.querySelector('iframe.viz-output');
+      if (!iframe || !el) return;
+      const iRect = iframe.getBoundingClientRect();
+      const eRect = el.getBoundingClientRect();  // inside iframe coords
+      const t = __floatToolbar;
+      const top = iRect.top + eRect.top - 48;
+      const left = iRect.left + eRect.left;
+      t.style.top  = Math.max(8, top)  + 'px';
+      t.style.left = Math.max(8, Math.min(window.innerWidth - 340, left)) + 'px';
+    }
+
+    function notifyIframeChange() {
+      const iframe = vizContainer.querySelector('iframe.viz-output');
+      if (iframe && iframe.contentDocument) {
+        currentVizHtml = '<!DOCTYPE html>' + iframe.contentDocument.documentElement.outerHTML;
+      }
+    }
+
+    function rgbToHex(rgb) {
+      if (!rgb || rgb === 'transparent') return null;
+      const m = rgb.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+      if (!m) return null;
+      return '#' + [m[1],m[2],m[3]].map(x => parseInt(x).toString(16).padStart(2,'0')).join('');
+    }
+
+    function getVizEditorScript() {
+      return `(function(){
+  if(window.__vizEditorActive)return;
+  window.__vizEditorActive=true;
+  var sel=null;
+  var SKIP=new Set(['HTML','HEAD','BODY','SCRIPT','STYLE','LINK','META']);
+
+  // Badge
+  var badge=document.createElement('div');
+  badge.id='__viz-editor-badge';
+  badge.style.cssText='position:fixed;bottom:8px;right:8px;background:rgba(37,99,235,.9);color:#fff;font-size:.6rem;padding:3px 10px;border-radius:10px;z-index:9999;pointer-events:none;font-family:system-ui';
+  badge.textContent='✎ Redigér: klik for at vælge · dobbeltklik for tekst · Del+Backspace for at slette';
+  document.body.appendChild(badge);
+
+  function select(el){
+    if(sel&&sel!==el){deselect();}
+    sel=el;
+    el.setAttribute('data-orig-outline',el.style.outline||'');
+    el.style.outline='2px solid #3b82f6';
+    el.style.outlineOffset='2px';
+    // Notify parent to show float toolbar
+    window.parent.postMessage({type:'viz-select',rect:{top:el.getBoundingClientRect().top,left:el.getBoundingClientRect().left,width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height}},'*');
+    window.parent.__floatTarget={el:el,iframe:window.frameElement};
+    var t=window.parent.__floatToolbar;
+    if(t){
+      window.parent.repositionToolbar(el);
+      t.style.display='flex';
+      var cs=window.getComputedStyle(el);
+      var c=window.parent.rgbToHex(cs.color);
+      var bg=window.parent.rgbToHex(cs.backgroundColor);
+      if(c)t.querySelector('#__fbt-color').value=c;
+      if(bg)t.querySelector('#__fbt-bg').value=bg;
+    } else { window.parent.showFloatToolbar(window.frameElement,el); }
+  }
+  function deselect(){
+    if(!sel)return;
+    sel.style.outline=sel.getAttribute('data-orig-outline')||'';
+    sel.style.outlineOffset='';
+    if(sel.contentEditable==='true'){sel.contentEditable='false';}
+    sel=null;
+    window.parent.hideFloatToolbar();
+  }
+
+  document.addEventListener('click',function(e){
+    if(SKIP.has(e.target.tagName))return;
+    e.stopPropagation();
+    if(sel===e.target){deselect();return;}
+    select(e.target);
+  },true);
+
+  document.addEventListener('dblclick',function(e){
+    if(SKIP.has(e.target.tagName))return;
+    e.preventDefault();e.stopPropagation();
+    var el=e.target;
+    select(el);
+    el.contentEditable='true';
+    el.focus();
+    // Place cursor at click position
+    el.addEventListener('blur',function(){
+      el.contentEditable='false';
+      window.parent.notifyIframeChange();
+    },{once:true});
+    el.addEventListener('keydown',function(ev){
+      if(ev.key==='Escape'){el.blur();}
+    },{once:true});
+  },true);
+
+  document.addEventListener('keydown',function(e){
+    if(!sel)return;
+    if((e.key==='Delete'||e.key==='Backspace')&&sel.contentEditable!=='true'){
+      e.preventDefault();
+      sel.remove();sel=null;
+      window.parent.hideFloatToolbar();
+      window.parent.notifyIframeChange();
+    }
+    if(e.key==='Escape')deselect();
+  });
+
+  // Hover highlight
+  document.addEventListener('mouseover',function(e){
+    if(SKIP.has(e.target.tagName)||e.target===sel)return;
+    if(!e.target.__hoverSaved){
+      e.target.__hoverSaved=e.target.style.outline||'none';
+    }
+    if(e.target!==sel)e.target.style.outline='1px dashed rgba(59,130,246,.45)';
+  },true);
+  document.addEventListener('mouseout',function(e){
+    if(e.target!==sel&&e.target.__hoverSaved!==undefined){
+      e.target.style.outline=e.target.__hoverSaved==='none'?'':e.target.__hoverSaved;
+    }
+  },true);
+
+  console.log('[VizEditor] Aktiv — klik på elementer for at redigere');
+})();`;
+    }
+
     // ── Møde-kontekst ──────────────────────────────────────────────────────────
     function toggleContext() {
       const fields = document.getElementById('contextFields');
