@@ -687,6 +687,36 @@
     }
     .viz-type-select:focus { border-color: var(--blue); }
 
+    /* ─── Meeting context strip ─── */
+    .context-strip {
+      border-top: 1px solid var(--border-2); flex-shrink: 0;
+    }
+    .context-toggle {
+      width: 100%; padding: 7px 14px; display: flex; align-items: center; gap: 6px;
+      background: none; border: none; cursor: pointer; font-family: var(--font);
+      font-size: .72rem; font-weight: 600; color: var(--muted); text-align: left;
+      transition: background var(--tr);
+    }
+    .context-toggle:hover { background: var(--bg); }
+    .context-toggle-icon { margin-left: auto; font-size: .65rem; transition: transform .2s; }
+    .context-toggle-icon.open { transform: rotate(90deg); }
+    .context-filled-badge {
+      font-size: .6rem; padding: 1px 6px; border-radius: 10px;
+      background: #dcfce7; color: #166534; font-weight: 700;
+    }
+    .context-fields {
+      padding: 0 14px 10px; display: flex; flex-direction: column; gap: 5px;
+    }
+    .ctx-input, .ctx-textarea {
+      width: 100%; padding: 5px 9px;
+      border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+      font-size: .72rem; color: var(--ink); background: var(--surface);
+      font-family: var(--font); outline: none; transition: border-color var(--tr);
+      box-sizing: border-box;
+    }
+    .ctx-textarea { resize: none; line-height: 1.4; }
+    .ctx-input:focus, .ctx-textarea:focus { border-color: var(--blue); }
+
     /* ─── Meeting title input ─── */
     .title-strip {
       padding: 6px 14px 0; flex-shrink: 0;
@@ -775,6 +805,48 @@
     body.teams-stage .teams-badge { display: inline-block !important; }
     body.teams-stage .viz-container { padding: 28px; }
     body.teams-content .teams-badge { display: inline-block !important; }
+
+    /* ─── Action items panel ─── */
+    .actions-bar {
+      padding: 8px 14px; border-bottom: 1px solid var(--border-2);
+      display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+      background: #f0fdf4;
+    }
+    .btn-action-items {
+      flex: 1; padding: 7px 14px; border-radius: var(--radius-sm);
+      background: #16a34a; color: #fff; border: none; cursor: pointer;
+      font-size: .78rem; font-weight: 700; font-family: var(--font);
+      transition: background .15s;
+    }
+    .btn-action-items:hover { background: #15803d; }
+    .btn-action-items:disabled { opacity: .6; cursor: default; }
+    .btn-action-close {
+      padding: 6px 10px; border-radius: var(--radius-sm);
+      background: none; border: 1.5px solid var(--border); cursor: pointer;
+      font-size: .8rem; color: var(--muted); font-family: var(--font);
+    }
+    .btn-action-close:hover { background: var(--bg); }
+    .actions-container {
+      border-bottom: 1px solid var(--border-2); max-height: 42vh;
+      overflow-y: auto; flex-shrink: 0; background: var(--white);
+    }
+    .actions-loading {
+      padding: 20px; display: flex; align-items: center; gap: 10px;
+      font-size: .8rem; color: var(--muted);
+    }
+    .actions-spinner {
+      width: 16px; height: 16px; border: 2px solid var(--border);
+      border-top-color: #16a34a; border-radius: 50%;
+      animation: spin .7s linear infinite; flex-shrink: 0;
+    }
+    .actions-error { padding: 14px; color: var(--red); font-size: .8rem; }
+
+    /* ─── Speaker label colours ─── */
+    .seg-avatar.spk-A { background: #2563eb !important; }
+    .seg-avatar.spk-B { background: #7c3aed !important; }
+    .seg-avatar.spk-C { background: #0891b2 !important; }
+    .seg-avatar.spk-D { background: #d97706 !important; }
+    .seg-avatar.spk-E { background: #dc2626 !important; }
   </style>
 </head>
 <body>
@@ -875,6 +947,21 @@
         </select>
       </div>
 
+      <!-- Møde-kontekst -->
+      <div class="context-strip" id="contextStrip">
+        <button class="context-toggle" id="contextToggle" onclick="toggleContext()">
+          <span>📋 Møde-kontekst</span>
+          <span class="context-toggle-icon" id="contextToggleIcon">▸</span>
+          <span class="context-filled-badge" id="contextFilledBadge" style="display:none">✓ Udfyldt</span>
+        </button>
+        <div class="context-fields" id="contextFields" style="display:none">
+          <input class="ctx-input" id="ctxPurpose"  type="text" placeholder="Formål med mødet (f.eks. kravafklaring for CER-compliance)..." autocomplete="off" oninput="updateContextBadge()" />
+          <input class="ctx-input" id="ctxProjects" type="text" placeholder="Relevante projekter / systemer / komponenter..." autocomplete="off" oninput="updateContextBadge()" />
+          <input class="ctx-input" id="ctxAttend"   type="text" placeholder="Deltagere og roller (f.eks. Jakob - projektleder, Marie - ingeniør)..." autocomplete="off" oninput="updateContextBadge()" />
+          <textarea class="ctx-textarea" id="ctxExtra" rows="2" placeholder="Yderligere kontekst til Claude (baggrund, beslutninger der allerede er taget, etc.)..." oninput="updateContextBadge()"></textarea>
+        </div>
+      </div>
+
       <!-- Mikrofon -->
       <div class="tab-pane active" id="paneMic">
         <div class="rec-row">
@@ -961,6 +1048,13 @@
           <button class="btn-ph-action" id="btnFullscreen"   title="Fuldskærm" onclick="toggleFullscreen()">⛶</button>
         </div>
       </div>
+
+      <!-- Action items bar -->
+      <div class="actions-bar" id="actionsBar" style="display:none">
+        <button class="btn-action-items" id="btnActionItems" onclick="triggerActionItems()">✓ Beslutninger &amp; Handlinger</button>
+        <button class="btn-action-close" onclick="document.getElementById('actionsContainer').style.display='none'">✕</button>
+      </div>
+      <div class="actions-container" id="actionsContainer" style="display:none"></div>
 
       <div class="viz-container" id="vizContainer">
         <div class="empty-state">
@@ -1258,7 +1352,15 @@
           const text = msg.transcript.trim();
           if (!text) return;
           const normalized = normalizeRegulatoryTerms(text);
-          roomSegments.push({ name: userName || 'Mig', text: normalized, isMine: true });
+          // Extract dominant speaker from words array
+          let speaker = null;
+          if (msg.words && msg.words.length) {
+            const counts = {};
+            msg.words.forEach(w => { if (w.speaker) counts[w.speaker] = (counts[w.speaker]||0)+1; });
+            const top = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+            if (top) speaker = top[0];
+          }
+          roomSegments.push({ name: userName || 'Mig', text: normalized, isMine: true, speaker });
           fullTranscript += normalized + ' ';
           updateWordBadge(); interimText = '';
           postSegment(normalized);
@@ -1505,6 +1607,7 @@
             vizType:       document.getElementById('vizTypeSelect').value,
             isIncremental: isAuto,
             previousViz:  isAuto ? currentVizHtml : null,
+            context:       getMeetingContext(),
           }),
         });
         if (!response.ok || !response.body) {
@@ -1851,12 +1954,22 @@
         transcriptEl.innerHTML = '<p class="placeholder" id="placeholder">Din tale vises her, mens du taler...</p>';
         return;
       }
+      // Show actions bar once there is transcript
+      const actionsBar = document.getElementById('actionsBar');
+      if (actionsBar && roomSegments.length > 3) actionsBar.style.display = 'flex';
+
       transcriptEl.innerHTML = roomSegments.map(seg => {
-        const initials = seg.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+        const displayName = seg.speaker
+          ? `${seg.name} <span style="font-size:.6rem;padding:1px 5px;border-radius:8px;background:#e0e7ff;color:#3730a3;font-weight:700">Taler ${seg.speaker}</span>`
+          : seg.name;
+        const initials = seg.speaker
+          ? seg.speaker
+          : seg.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+        const spkClass = seg.speaker ? ` spk-${seg.speaker}` : (seg.isMine ? ' mine' : '');
         return `<div class="seg-block">
-          <div class="seg-avatar${seg.isMine?' mine':''}">${esc(initials)}</div>
+          <div class="seg-avatar${spkClass}">${esc(initials)}</div>
           <div class="seg-content">
-            <span class="seg-name${seg.isMine?' mine':''}">${esc(seg.name)}</span>
+            <span class="seg-name${seg.isMine?' mine':''}">${displayName}</span>
             <span class="seg-text">${esc(seg.text)}</span>
           </div>
         </div>`;
@@ -1883,11 +1996,99 @@
     }
 
     // ── Share room link ────────────────────────────────────────────────────────
+    // ── Møde-kontekst ──────────────────────────────────────────────────────────
+    function toggleContext() {
+      const fields = document.getElementById('contextFields');
+      const icon   = document.getElementById('contextToggleIcon');
+      const open   = fields.style.display === 'none';
+      fields.style.display = open ? 'flex' : 'none';
+      fields.style.flexDirection = 'column';
+      icon.classList.toggle('open', open);
+    }
+    function updateContextBadge() {
+      const filled = ['ctxPurpose','ctxProjects','ctxAttend','ctxExtra']
+        .some(id => document.getElementById(id).value.trim());
+      document.getElementById('contextFilledBadge').style.display = filled ? '' : 'none';
+    }
+    function getMeetingContext() {
+      const p = document.getElementById('ctxPurpose').value.trim();
+      const r = document.getElementById('ctxProjects').value.trim();
+      const a = document.getElementById('ctxAttend').value.trim();
+      const e = document.getElementById('ctxExtra').value.trim();
+      const parts = [];
+      if (p) parts.push('Formål: ' + p);
+      if (r) parts.push('Projekter/systemer: ' + r);
+      if (a) parts.push('Deltagere: ' + a);
+      if (e) parts.push('Kontekst: ' + e);
+      return parts.join('\n');
+    }
+
+    // ── Action items / beslutninger ─────────────────────────────────────────────
+    async function triggerActionItems() {
+      const text = activeTab === 'paste'
+        ? pasteInput.value.trim()
+        : (fullTranscript + ' ' + interimText).trim();
+      if (!text) { showError('Ingen transskription endnu.'); return; }
+
+      const btn = document.getElementById('btnActionItems');
+      btn.disabled = true; btn.textContent = '⏳ Analyserer...';
+
+      const actionsContainer = document.getElementById('actionsContainer');
+      actionsContainer.innerHTML = '';
+      actionsContainer.style.display = 'block';
+      actionsContainer.innerHTML = `<div class="actions-loading">
+        <div class="actions-spinner"></div>
+        <span>Claude analyserer mødet for beslutninger og handlingspunkter...</span>
+      </div>`;
+
+      try {
+        const res = await fetch('/api/actions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transcript: text,
+            roomId:     currentRoomId,
+            title:      document.getElementById('titleInput').value.trim() || null,
+            context:    getMeetingContext(),
+          }),
+        });
+        if (!res.ok || !res.body) throw new Error('Serverfejl');
+        const reader  = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '', accHtml = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop();
+          for (const line of lines) {
+            if (!line.startsWith('data:')) continue;
+            let ev;
+            try { ev = JSON.parse(line.slice(5)); } catch { continue; }
+            if (ev.chunk) accHtml += ev.chunk;
+            if (ev.done)  { actionsContainer.innerHTML = accHtml; }
+          }
+        }
+      } catch(err) {
+        actionsContainer.innerHTML = `<div class="actions-error">Fejl: ${err.message}</div>`;
+      } finally {
+        btn.disabled = false; btn.textContent = '✓ Beslutninger & Handlinger';
+      }
+    }
+
+    // ── Invite-flow ─────────────────────────────────────────────────────────────
     function shareRoomLink() {
       const url = `${location.origin}/?room=${currentRoomId}`;
-      navigator.clipboard.writeText(url).then(() => showShareToast()).catch(() => {
-        prompt('Del dette link med mødedeltagere:', url);
-      });
+      navigator.clipboard.writeText(url)
+        .then(() => {
+          const btn = document.querySelector('.btn-room-share');
+          const orig = btn.innerHTML;
+          btn.innerHTML = '✓ Kopieret!';
+          btn.style.background = '#dcfce7'; btn.style.color = '#166534';
+          setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; btn.style.color = ''; }, 2000);
+        })
+        .catch(() => prompt('Del dette invite-link:', url));
     }
 
     // ── App init ───────────────────────────────────────────────────────────────

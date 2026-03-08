@@ -657,7 +657,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => { body += chunk; });
     req.on('end', async () => {
       try {
-        const { transcript: rawTranscript, roomId, title, vizType, isIncremental, previousViz } = JSON.parse(body);
+        const { transcript: rawTranscript, roomId, title, vizType, isIncremental, previousViz, context } = JSON.parse(body);
         // If roomId provided, use attributed room transcript
         let transcript = rawTranscript;
         if (roomId && rooms.has(roomId)) {
@@ -694,7 +694,7 @@ const server = http.createServer(async (req, res) => {
             system:     SYSTEM_PROMPT,
             messages: [{
               role:    'user',
-              content: `${title ? `Mødetitel: ${title}\n\n` : ''}Her er mødetransskriptionen:\n\n${transcript}\n\n${vizType && vizType !== 'auto' ? `VIGTIG INSTRUKS: Generer SPECIFIKT denne visualiseringstype — ikke noget andet: ${vizType}\n\n` : ''}${isIncremental && previousViz ? `INKREMENTEL OPDATERING: Du har allerede genereret en visualisering til dette møde (vedlagt nedenfor). Mødet er fortsat — opdater og udvid visualiseringen med de nyeste informationer fra transskriptionen. Bevar den overordnede struktur og tilføj/juster indhold.\n\nNUVÆRENDE VISUALISERING (HTML):\n${previousViz.slice(0, 3000)}...\n\n` : ''}Generer en passende HTML-visualisering.`,
+              content: `${title ? `Mødetitel: ${title}\n\n` : ''}${context ? `MØDE-KONTEKST:\n${context}\n\n` : ''}Her er mødetransskriptionen:\n\n${transcript}\n\n${vizType && vizType !== 'auto' ? `VIGTIG INSTRUKS: Generer SPECIFIKT denne visualiseringstype — ikke noget andet: ${vizType}\n\n` : ''}${isIncremental && previousViz ? `INKREMENTEL OPDATERING: Du har allerede genereret en visualisering til dette møde (vedlagt nedenfor). Mødet er fortsat — opdater og udvid visualiseringen med de nyeste informationer fra transskriptionen. Bevar den overordnede struktur og tilføj/juster indhold.\n\nNUVÆRENDE VISUALISERING (HTML):\n${previousViz.slice(0, 3000)}...\n\n` : ''}Generer en passende HTML-visualisering.`,
             }],
           }),
         });
@@ -857,6 +857,93 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ error: err.message }));
     }
+  }
+
+  // POST /api/actions — Ekstraher beslutninger og handlingspunkter
+  if (req.method === 'POST' && req.url === '/api/actions') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const { transcript: rawTranscript, roomId, title, context } = JSON.parse(body);
+        let transcript = rawTranscript;
+        if (roomId && rooms.has(roomId)) {
+          const room = rooms.get(roomId);
+          if (room.transcript.length > 0) {
+            transcript = room.transcript.map(s => `[${s.name}]: ${s.text}`).join('\n');
+          }
+        }
+        if (!transcript || !transcript.trim()) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ error: 'Ingen transskription.' }));
+        }
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'X-Accel-Buffering': 'no',
+        });
+        res.flushHeaders();
+        const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 4096,
+            stream: true,
+            system: `Du er en mødeassistent for Grundfos. Analyser mødetransskriptionen og returner KUN valid HTML med inline CSS — ingen markdown, ingen forklaringer.
+
+Generer et struktureret HTML-kort med:
+1. BESLUTNINGER — konkrete beslutninger truffet i mødet (med bullet-punkter)
+2. HANDLINGSPUNKTER — næste skridt med ansvarlig person og deadline hvis nævnt
+3. ÅBNE SPØRGSMÅL — uafklarede punkter der kræver opfølgning
+
+HTML-styling skal matche Grundfos brand:
+- Primær farve: #002A5C (navy)
+- Accent: #0077C8 (blå)
+- Baggrund: hvid, kort med border-radius: 12px, box-shadow
+- Font: system-ui, sans-serif
+- Brug grønne check-ikoner (✓) for beslutninger, pile (→) for handlinger, spørgsmålstegn (?) for åbne punkter
+- Kompakt, professionelt layout — maks 600px bredde, centreret
+- Ingen <html>/<body>/<head> tags — kun en <div> container`,
+            messages: [{
+              role: 'user',
+              content: `${title ? `Mødetitel: ${title}\n\n` : ''}${context ? `Kontekst: ${context}\n\n` : ''}Transskription:\n\n${transcript}\n\nGenerer beslutninger og handlingspunkter som HTML.`,
+            }],
+          }),
+        });
+        if (!apiRes.ok) { res.write(`data: ${JSON.stringify({ error: 'Claude API fejl' })}\n\n`); return res.end(); }
+        let fullHtml = '';
+        for await (const chunk of apiRes.body) {
+          const lines = Buffer.from(chunk).toString('utf8').split('\n');
+          for (const line of lines) {
+            if (!line.startsWith('data:')) continue;
+            const raw = line.slice(5).trim();
+            if (raw === '[DONE]') continue;
+            let ev; try { ev = JSON.parse(raw); } catch { continue; }
+            if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
+              const t = ev.delta.text;
+              fullHtml += t;
+              try { res.write(`data: ${JSON.stringify({ chunk: t })}\n\n`); } catch (_) {}
+            }
+            if (ev.type === 'message_stop') {
+              try { res.write(`data: ${JSON.stringify({ done: true })}\n\n`); } catch (_) {}
+              res.end(); return;
+            }
+          }
+        }
+        res.end();
+      } catch (err) {
+        console.error('Actions fejl:', err);
+        try { res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`); } catch (_) {}
+        res.end();
+      }
+    });
+    return;
   }
 
   // GET /api/history
